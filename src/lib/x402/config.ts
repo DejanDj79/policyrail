@@ -4,6 +4,12 @@ export const SOLANA_DEVNET_NETWORK =
 export const SOLANA_DEVNET_USDC_MINT =
   "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU" as const;
 
+export const SOLANA_MAINNET_NETWORK =
+  "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp" as const;
+
+export const SOLANA_MAINNET_USDC_MINT =
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" as const;
+
 export const SOLANA_DEVNET_RPC =
   process.env.SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
 
