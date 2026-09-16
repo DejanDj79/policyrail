@@ -8,7 +8,7 @@ Built for **Crypto World's Fair 2026** with Solana as the settlement layer.
 
 ## MVP
 
-The end-to-end demo is designed to show:
+The end-to-end demo shows:
 
 1. Create an AI agent.
 2. Give it a task and budget.
@@ -16,18 +16,18 @@ The end-to-end demo is designed to show:
 4. Evaluate every proposal against deterministic spending policies.
 5. Approve or reject the purchase.
 6. Feed rejection reasons back to the AI agent so it can choose an alternative.
-7. Store payment decisions and AI intent in a transparent audit trail.
-8. Settle approved payments on Solana through x402 in the settlement milestone.
+7. Settle approved resources through x402 using USDC on Solana Devnet.
+8. Persist AI intent, policy decisions, settlement state, and Solana transaction signatures in the audit trail.
 
 ## Current milestone
 
-PolicyRail now has two intentionally separate decision layers.
+PolicyRail now has three intentionally separate layers.
 
 ### AI procurement layer
 
 The OpenAI-powered research agent decides which available paid resource would best advance its task. If PolicyRail rejects a proposal, the agent receives the policy reason and can adapt by selecting another resource.
 
-The demo currently uses a controlled catalog of synthetic paid resources so the procurement and policy behavior can be tested deterministically before real x402 settlement is added.
+The demo uses a controlled catalog of synthetic research resources so the procurement behavior is repeatable, while access to approved resources can be paid for through the real x402 protocol.
 
 ### Deterministic policy layer
 
@@ -39,7 +39,15 @@ The LLM never authorizes its own payment. PolicyRail evaluates proposed purchase
 - Allowed spending categories
 - Blocked providers
 
-Every AI proposal, policy approval/rejection, and task completion is persisted in PostgreSQL through Supabase.
+Policy approval creates an `authorized` payment request. It does **not** count as spend until settlement succeeds.
+
+### x402 / Solana settlement layer
+
+When `POLICYRAIL_X402_ENABLED=true`, an approved purchase is sent to an x402-protected API route. The x402 client signs an exact USDC payment on Solana Devnet, the facilitator verifies and settles it, and PolicyRail stores the resulting transaction signature before adding the resource to the agent's evidence.
+
+The x402 client also has its own per-payment spend cap equal to the amount PolicyRail just approved. A resource cannot silently raise its price after authorization and still get signed.
+
+When x402 is disabled, the same flow runs in `simulated` settlement mode so development can continue without a funded wallet.
 
 ## Stack
 
@@ -47,11 +55,10 @@ Every AI proposal, policy approval/rejection, and task completion is persisted i
 - Supabase / PostgreSQL + Row Level Security
 - OpenAI Responses API with Structured Outputs
 - OpenAI `gpt-5.6-luna` by default for procurement decisions
-- Solana Kit — settlement milestone
-- Wallet Standard — settlement milestone
-- USDC on Solana — settlement milestone
-- x402 — settlement milestone
-- Solana Payment Channels — later milestone
+- x402 v2
+- Solana Kit
+- USDC on Solana Devnet for the hackathon settlement demo
+- Solana Payment Channels — later optimization for high-frequency micropayments
 
 ## Local setup
 
@@ -74,7 +81,7 @@ OPENAI_AGENT_MODEL=gpt-5.6-luna
 
 For the frictionless hackathon demo, enable **Anonymous Sign-Ins** in Supabase Auth. Anonymous users still receive authenticated Supabase sessions, so PolicyRail's RLS ownership policies continue to isolate each user's data.
 
-Run:
+Run the application first in simulated settlement mode:
 
 ```bash
 npm run typecheck
@@ -83,10 +90,48 @@ npm run dev
 
 Open `http://localhost:3000` and click **Run autonomous agent**.
 
-A successful run should create a task, generate AI resource proposals, persist policy decisions in `payment_requests`, persist the complete decision trail in `audit_events`, and return the agent's final research result.
+## Enable real x402 settlement on Solana Devnet
+
+Generate dedicated local Devnet wallets:
+
+```bash
+npm run wallet:setup
+```
+
+The script writes private keys only to `.env.local` (which is ignored by Git) and prints only the public addresses for:
+
+- the PolicyRail agent/payer wallet
+- the demo merchant/payee wallet
+
+Fund **both public addresses** with test USDC on **Solana Devnet** using Circle's public testnet faucet. Funding both addresses also ensures that the required USDC associated token accounts exist.
+
+After both wallets have Devnet USDC, change this line in `.env.local`:
+
+```env
+POLICYRAIL_X402_ENABLED=true
+```
+
+The setup script also adds these values automatically when missing:
+
+```env
+SOLANA_RPC_URL=https://api.devnet.solana.com
+X402_FACILITATOR_URL=https://x402.org/facilitator
+POLICYRAIL_AGENT_ADDRESS=...
+POLICYRAIL_AGENT_PRIVATE_KEY=...
+POLICYRAIL_MERCHANT_ADDRESS=...
+POLICYRAIL_MERCHANT_PRIVATE_KEY=...
+```
+
+Restart the dev server after changing environment variables:
+
+```bash
+npm run dev
+```
+
+A successful x402 run shows `SETTLED · x402 exact · Solana Devnet` in the audit UI and links the on-chain transaction to Solana Explorer.
 
 ## Security principle
 
 **AI decides what it wants to buy. PolicyRail decides what it is allowed to spend.**
 
-The OpenAI model never receives a Supabase secret key, treasury private key, or direct authority to execute a payment.
+The OpenAI model never receives a Supabase secret key, Solana private key, or direct authority to execute a payment. Wallet signing happens only after deterministic PolicyRail authorization, and private keys remain server-side.
