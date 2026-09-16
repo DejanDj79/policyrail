@@ -1,0 +1,38 @@
+.probePanel {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center !important;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.probePanel > div {
+  min-width: 0;
+}
+
+.probeButton {
+  max-width: 100%;
+  box-sizing: border-box;
+  justify-self: end;
+  white-space: nowrap;
+}
+
+@media (max-width: 800px) {
+  .probePanel {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start !important;
+  }
+
+  .probeButton {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 420px) {
+  .probeButton {
+    width: 100%;
+    white-space: normal;
+  }
+}
