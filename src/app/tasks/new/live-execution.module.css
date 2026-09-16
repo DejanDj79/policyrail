@@ -168,6 +168,107 @@
   font-size: 13px;
 }
 
+.compact {
+  width: 100%;
+  margin: 0;
+  padding: 17px;
+  border-radius: 18px;
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.2);
+}
+
+.compact .header {
+  gap: 12px;
+  align-items: center;
+}
+
+.compact .eyebrow {
+  margin-bottom: 5px;
+  font-size: 10px;
+}
+
+.compact .header h2 {
+  font-size: 19px;
+  line-height: 1.15;
+}
+
+.compact .statusBlock {
+  min-width: 112px;
+  padding: 8px 9px;
+  border-radius: 10px;
+  gap: 2px 6px;
+}
+
+.compact .statusBlock strong,
+.compact .statusBlock small {
+  font-size: 9px;
+}
+
+.compact .timeline {
+  max-height: min(52vh, 490px);
+  margin-top: 14px;
+  gap: 7px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 3px;
+  scrollbar-width: thin;
+}
+
+.compact .event {
+  grid-template-columns: 13px minmax(0, 1fr);
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 10px;
+}
+
+.compact .eventMarker {
+  width: 7px;
+  height: 7px;
+  margin-top: 4px;
+  box-shadow: 0 0 0 3px rgba(127, 137, 155, 0.08);
+}
+
+.compact .eventTop {
+  gap: 8px;
+}
+
+.compact .eventTop strong {
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.compact .eventTop span {
+  font-size: 9px;
+}
+
+.compact .eventContent p {
+  display: -webkit-box;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.compact .waiting {
+  gap: 8px;
+  padding: 6px 3px;
+  font-size: 10px;
+}
+
+.compact .error {
+  margin-top: 10px;
+  padding: 9px 10px;
+  font-size: 10px;
+}
+
+@media (max-width: 900px) {
+  .compact .timeline {
+    max-height: 380px;
+  }
+}
+
 @media (max-width: 680px) {
   .panel {
     width: calc(100% - 36px);
@@ -186,5 +287,24 @@
     align-items: flex-start;
     flex-direction: column;
     gap: 4px;
+  }
+
+  .compact {
+    width: 100%;
+    padding: 15px;
+  }
+
+  .compact .header {
+    align-items: stretch;
+    flex-direction: row;
+  }
+
+  .compact .statusBlock {
+    width: auto;
+  }
+
+  .compact .eventTop {
+    align-items: baseline;
+    flex-direction: row;
   }
 }
