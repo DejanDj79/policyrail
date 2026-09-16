@@ -19,6 +19,15 @@
   white-space: nowrap;
 }
 
+.probePanel ~ section > div:nth-child(2) {
+  max-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 4px;
+  align-content: start;
+}
+
 @media (max-width: 800px) {
   .probePanel {
     grid-template-columns: minmax(0, 1fr);
@@ -34,5 +43,9 @@
   .probeButton {
     width: 100%;
     white-space: normal;
+  }
+
+  .probePanel ~ section > div:nth-child(2) {
+    max-height: 360px;
   }
 }
