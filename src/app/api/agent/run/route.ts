@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { discoverResourcesForTask } from "@/lib/agent/discover-resources";
 import { DEMO_RESOURCES, getResourceById } from "@/lib/agent/resources";
 import {
   authorizePaymentForTask,
@@ -102,8 +103,45 @@ export async function POST(request: Request) {
   let finalAnswer = "";
 
   try {
-    for (let step = 0; step < MAX_STEPS; step += 1) {
-      const availableResources = DEMO_RESOURCES.filter(
+    const discovery = await discoverResourcesForTask(
+      openai,
+      task.prompt,
+      DEMO_RESOURCES,
+      MODEL
+    );
+
+    const { error: discoveryAuditError } = await supabase
+      .from("audit_events")
+      .insert({
+        agent_id: task.agent_id,
+        task_id: task.id,
+        event_type: "resource_discovery_completed",
+        payload: {
+          model: MODEL,
+          task_supported: discovery.taskSupported,
+          resource_ids: discovery.resourceIds,
+          resource_count: discovery.resourceIds.length,
+          rationale: discovery.rationale,
+          confidence: discovery.confidence,
+          input_tokens: discovery.inputTokens,
+          output_tokens: discovery.outputTokens,
+        },
+      });
+
+    if (discoveryAuditError) {
+      throw new Error(discoveryAuditError.message);
+    }
+
+    const discoveredResources = discovery.resources;
+    const discoveredIds = new Set(discovery.resourceIds);
+
+    if (!discovery.taskSupported || discoveredResources.length === 0) {
+      finalAnswer =
+        "No suitable paid resources were found in the current PolicyRail directory for this task. No payment was attempted.";
+    }
+
+    for (let step = 0; step < MAX_STEPS && !finalAnswer; step += 1) {
+      const availableResources = discoveredResources.filter(
         (resource) => !attemptedIds.has(resource.id)
       );
 
@@ -130,7 +168,7 @@ export async function POST(request: Request) {
           "For an initial proposal, prioritize evidence quality while remaining inside the overall task budget.",
           "If a previous proposal was rejected, explicitly adapt to the rejection reason and prefer a viable alternative.",
           "For comparison tasks, gather complementary market/search evidence and benchmark/data evidence before completing when those resource types are available.",
-          "Use only the resources in the supplied catalog. Do not invent providers or prices.",
+          "Use only the resources discovered for this task. Do not invent providers or prices.",
           "When completing, set resource_id to none and put the final task answer in final_answer.",
           "When buying, choose a real resource_id and keep final_answer empty.",
           "Keep rationale concise and economically meaningful.",
@@ -138,6 +176,11 @@ export async function POST(request: Request) {
         input: JSON.stringify({
           task: task.prompt,
           task_budget_cents: task.budget_cents,
+          discovery: {
+            rationale: discovery.rationale,
+            confidence: discovery.confidence,
+            resource_ids: discovery.resourceIds,
+          },
           current_spend_cents: attempts
             .filter((attempt) => attempt.approved)
             .reduce((sum, attempt) => sum + attempt.amountCents, 0),
@@ -201,7 +244,11 @@ export async function POST(request: Request) {
 
       const resource = getResourceById(choice.resource_id);
 
-      if (!resource || attemptedIds.has(resource.id)) {
+      if (
+        !resource ||
+        !discoveredIds.has(resource.id) ||
+        attemptedIds.has(resource.id)
+      ) {
         throw new Error("The AI agent selected an unavailable resource.");
       }
 
@@ -392,6 +439,7 @@ export async function POST(request: Request) {
           result: finalAnswer,
           total_spent_cents: totalSpentCents,
           settlement_mode: isX402Enabled() ? "x402-solana-devnet" : "simulated",
+          discovered_resources: discovery.resourceIds,
           approved_resources: attempts
             .filter((attempt) => attempt.approved)
             .map((attempt) => attempt.resourceId),
@@ -411,6 +459,12 @@ export async function POST(request: Request) {
     return NextResponse.json({
       model: MODEL,
       taskId: task.id,
+      discovery: {
+        taskSupported: discovery.taskSupported,
+        resourceIds: discovery.resourceIds,
+        rationale: discovery.rationale,
+        confidence: discovery.confidence,
+      },
       finalAnswer,
       totalSpentCents,
       settlementMode: isX402Enabled() ? "x402-solana-devnet" : "simulated",
