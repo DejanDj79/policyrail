@@ -29,9 +29,17 @@ type Attempt = {
   transactionSignature: string | null;
 };
 
+type Discovery = {
+  taskSupported: boolean;
+  resourceIds: string[];
+  rationale: string;
+  confidence: "low" | "medium" | "high";
+};
+
 type RunPayload = {
   model?: string;
   taskId?: string;
+  discovery?: Discovery;
   finalAnswer?: string;
   totalSpentCents?: number;
   settlementMode?: "simulated" | "x402-solana-devnet";
@@ -58,6 +66,7 @@ export default function NewTaskPage() {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [discovery, setDiscovery] = useState<Discovery | null>(null);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [finalAnswer, setFinalAnswer] = useState<string | null>(null);
   const [spent, setSpent] = useState(0);
@@ -129,6 +138,7 @@ export default function NewTaskPage() {
 
     setRunning(true);
     setError(null);
+    setDiscovery(null);
     setAttempts([]);
     setFinalAnswer(null);
     setSpent(0);
@@ -168,6 +178,7 @@ export default function NewTaskPage() {
         throw new Error(runPayload.error ?? "Agent execution failed.");
       }
 
+      setDiscovery(runPayload.discovery ?? null);
       setAttempts(runPayload.attempts);
       setSpent(runPayload.totalSpentCents ?? 0);
       setFinalAnswer(runPayload.finalAnswer ?? null);
@@ -199,8 +210,8 @@ export default function NewTaskPage() {
           <p className={styles.eyebrow}>NEW AUTONOMOUS TASK</p>
           <h1>Tell the agent what to achieve.</h1>
           <p>
-            Set the objective and a task-specific budget. PolicyRail still enforces the agent&apos;s
-            transaction, category and 24-hour limits before any wallet signature.
+            Set the objective and a task-specific budget. The agent first discovers relevant directory
+            resources, then PolicyRail enforces every payment before the wallet signs.
           </p>
         </div>
       </section>
@@ -233,14 +244,15 @@ export default function NewTaskPage() {
           />
           <div className={styles.promptMeta}>
             <span>{prompt.length}/4000</span>
-            <span>Synthetic MVP resource catalog</span>
+            <span>Task-aware directory discovery</span>
           </div>
 
           <div className={styles.disclosure}>
             <strong>Current MVP scope</strong>
             <p>
-              You can define the task freely, but today&apos;s synthetic paid-resource catalog is centered
-              on AI inference-provider research. Dynamic resource discovery is the next expansion.
+              The agent now filters the resource directory for each task before procurement. The current
+              synthetic directory is still centered on AI inference-provider research; expanding the
+              catalog to more domains is the next step.
             </p>
           </div>
 
@@ -286,26 +298,27 @@ export default function NewTaskPage() {
             disabled={loading || running || !agent || !policy}
             onClick={runTask}
           >
-            {loading ? "Loading policy…" : running ? "Agent is procuring…" : "Run task"}
+            {loading ? "Loading policy…" : running ? "Discovering & procuring…" : "Run task"}
           </button>
         </div>
 
         <aside className={styles.sidePanel}>
           <p className={styles.label}>EXECUTION BOUNDARY</p>
-          <h2>Policy before payment.</h2>
+          <h2>Discovery before procurement.</h2>
           <div className={styles.steps}>
             <span>1 · Agent interprets objective</span>
-            <span>2 · Agent proposes paid resource</span>
-            <span>3 · PolicyRail authorizes or rejects</span>
-            <span>4 · Agent adapts when rejected</span>
-            <span>5 · x402 settles approved spend</span>
+            <span>2 · Directory discovery finds relevant resources</span>
+            <span>3 · Agent proposes a paid resource</span>
+            <span>4 · PolicyRail authorizes or rejects</span>
+            <span>5 · Agent adapts when rejected</span>
+            <span>6 · x402 settles approved spend</span>
           </div>
           <Link href="/resources">Browse resource directory →</Link>
           <Link href="/policy">Review active policy →</Link>
         </aside>
       </section>
 
-      {attempts.length > 0 || finalAnswer ? (
+      {discovery || attempts.length > 0 || finalAnswer ? (
         <section className={styles.results}>
           <div className={styles.resultsHeader}>
             <div>
@@ -314,6 +327,18 @@ export default function NewTaskPage() {
             </div>
             <div className={styles.spendBadge}>{money(spent)} spent</div>
           </div>
+
+          {discovery ? (
+            <div className={styles.finalAnswer}>
+              <span>
+                Resource discovery · {discovery.resourceIds.length} match{discovery.resourceIds.length === 1 ? "" : "es"} · {discovery.confidence} confidence
+              </span>
+              <p>{discovery.rationale}</p>
+              {discovery.resourceIds.length > 0 ? (
+                <p><b>Matched:</b> {discovery.resourceIds.join(", ")}</p>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className={styles.timeline}>
             {attempts.map((attempt, index) => (
