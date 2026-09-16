@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./live-execution.module.css";
 
 type AuditEvent = {
@@ -140,6 +140,7 @@ export default function LiveExecution({
   const [status, setStatus] = useState("running");
   const [spentCents, setSpentCents] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const timelineRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -179,6 +180,14 @@ export default function LiveExecution({
     };
   }, [taskId, running]);
 
+  useEffect(() => {
+    if (!compact || !timelineRef.current) return;
+    timelineRef.current.scrollTo({
+      top: timelineRef.current.scrollHeight,
+      behavior: events.length > 1 ? "smooth" : "auto",
+    });
+  }, [compact, events.length]);
+
   const headline = useMemo(() => {
     if (status === "completed") return "Execution complete";
     if (status === "failed") return "Execution failed";
@@ -205,7 +214,7 @@ export default function LiveExecution({
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
-      <div className={styles.timeline}>
+      <div className={styles.timeline} ref={timelineRef}>
         {events.length === 0 ? (
           <div className={styles.waiting}>
             <span className={styles.waitingDot} />
