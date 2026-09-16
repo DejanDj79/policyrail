@@ -84,7 +84,7 @@
 }
 
 .layout {
-  --task-panel-height: 510px;
+  --task-panel-height: 560px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 390px;
   gap: 18px;
