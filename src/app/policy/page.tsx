@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import WalletCard from "./WalletCard";
 
 type Agent = {
   id: string;
@@ -212,6 +213,8 @@ export default function PolicyPage() {
 
       <section className="settingsGrid">
         <div className="settingsMain">
+          <WalletCard />
+
           <section className="panel settingsPanel">
             <div className="panelHeader">
               <div>
