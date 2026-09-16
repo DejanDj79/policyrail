@@ -37,10 +37,12 @@ function eventTitle(event: AuditEvent) {
       return "Task created";
     case "resource_discovery_completed": {
       const count = payloadNumber(payload, "resource_count") ?? 0;
-      return count === 0 ? "No suitable resources found" : `Discovery found ${count} relevant resource${count === 1 ? "" : "s"}`;
+      return count === 0
+        ? "No suitable resources"
+        : `Discovery found ${count} resource${count === 1 ? "" : "s"}`;
     }
     case "agent_resource_proposed":
-      return `Agent proposed ${payloadText(payload, "resource_name") ?? "a paid resource"}`;
+      return `Agent proposed ${payloadText(payload, "resource_name") ?? "resource"}`;
     case "payment_rejected":
       return "PolicyRail blocked payment";
     case "payment_approved":
@@ -61,7 +63,9 @@ function eventBody(event: AuditEvent) {
 
   if (event.event_type === "task_created") {
     const budget = payloadNumber(payload, "budget_cents");
-    return budget === null ? "Execution entered the policy-controlled flow." : `Task budget: $${(budget / 100).toFixed(2)}.`;
+    return budget === null
+      ? "Execution entered the policy-controlled flow."
+      : `Task budget: $${(budget / 100).toFixed(2)}.`;
   }
 
   if (event.event_type === "resource_discovery_completed") {
@@ -96,7 +100,9 @@ function eventBody(event: AuditEvent) {
 
   if (event.event_type === "task_completed") {
     const spent = payloadNumber(payload, "total_spent_cents");
-    return spent === null ? "The agent completed the task." : `Execution completed with $${(spent / 100).toFixed(2)} settled spend.`;
+    return spent === null
+      ? "The agent completed the task."
+      : `Execution completed with $${(spent / 100).toFixed(2)} settled spend.`;
   }
 
   return "Audit event recorded.";
@@ -121,7 +127,15 @@ function timeLabel(value: string) {
   });
 }
 
-export default function LiveExecution({ taskId, running }: { taskId: string; running: boolean }) {
+export default function LiveExecution({
+  taskId,
+  running,
+  compact = false,
+}: {
+  taskId: string;
+  running: boolean;
+  compact?: boolean;
+}) {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [status, setStatus] = useState("running");
   const [spentCents, setSpentCents] = useState(0);
@@ -176,7 +190,7 @@ export default function LiveExecution({ taskId, running }: { taskId: string; run
   }, [events, status]);
 
   return (
-    <section className={styles.panel} aria-live="polite">
+    <section className={`${styles.panel} ${compact ? styles.compact : ""}`} aria-live="polite">
       <div className={styles.header}>
         <div>
           <p className={styles.eyebrow}>LIVE EXECUTION</p>
