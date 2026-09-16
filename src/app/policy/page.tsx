@@ -213,7 +213,7 @@ export default function PolicyPage() {
 
       <section className="settingsGrid">
         <div className="settingsMain">
-          <WalletCard />
+          {!initializing && agent ? <WalletCard /> : null}
 
           <section className="panel settingsPanel">
             <div className="panelHeader">
