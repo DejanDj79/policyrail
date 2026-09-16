@@ -76,7 +76,7 @@ export async function authorizePaymentForTask(
     taskBudgetCents: storedPolicy.task_budget_cents,
     dailyBudgetCents: storedPolicy.daily_budget_cents,
     maxTransactionCents: storedPolicy.max_transaction_cents,
-    allowedCategories: storedPolicy.allowed_categories.filter((category) =>
+    allowedCategories: storedPolicy.allowed_categories.filter((category: string) =>
       VALID_CATEGORIES.includes(category as SpendingCategory)
     ) as SpendingCategory[],
     blockedProviders: storedPolicy.blocked_providers,
