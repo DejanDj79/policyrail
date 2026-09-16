@@ -4,6 +4,7 @@ import {
   type PaidResource,
 } from "@/lib/agent/resources";
 import type { SpendingCategory } from "@/lib/policy/types";
+import { fetchBazaarCatalog } from "@/lib/resources/bazaar-client";
 import {
   SOLANA_DEVNET_NETWORK,
   SOLANA_DEVNET_USDC_MINT,
@@ -43,10 +44,6 @@ type BazaarItem = {
   type?: unknown;
   accepts?: unknown;
   extensions?: unknown;
-};
-
-type BazaarResponse = {
-  items?: unknown;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -202,27 +199,9 @@ class BazaarResourceRegistry implements ResourceRegistry {
   };
 
   private async fetchResources() {
-    const facilitatorUrl =
-      process.env.POLICYRAIL_BAZAAR_URL ??
-      process.env.X402_FACILITATOR_URL ??
-      "https://x402.org/facilitator";
-    const endpoint = new URL(`${facilitatorUrl.replace(/\/$/, "")}/discovery/resources`);
-    endpoint.searchParams.set("type", "http");
-    endpoint.searchParams.set("limit", "100");
+    const catalog = await fetchBazaarCatalog(100);
 
-    const response = await fetch(endpoint, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(6_000),
-    });
-
-    if (!response.ok) {
-      throw new Error(`x402 Bazaar discovery failed with HTTP ${response.status}`);
-    }
-
-    const payload = (await response.json()) as BazaarResponse;
-    if (!Array.isArray(payload.items)) return [];
-
-    return payload.items
+    return catalog.items
       .map((item) => (isRecord(item) ? mapBazaarItem(item as BazaarItem) : null))
       .filter((resource): resource is RegistryResource => resource !== null);
   }
