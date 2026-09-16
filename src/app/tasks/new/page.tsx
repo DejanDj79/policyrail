@@ -188,6 +188,7 @@ export default function NewTaskPage() {
         <div className={styles.navLinks}>
           <Link href="/dashboard">Dashboard</Link>
           <Link className={styles.active} href="/tasks/new">New task</Link>
+          <Link href="/resources">Resources</Link>
           <Link href="/activity">Activity</Link>
           <Link href="/policy">Agent policy</Link>
         </div>
@@ -299,6 +300,7 @@ export default function NewTaskPage() {
             <span>4 · Agent adapts when rejected</span>
             <span>5 · x402 settles approved spend</span>
           </div>
+          <Link href="/resources">Browse resource directory →</Link>
           <Link href="/policy">Review active policy →</Link>
         </aside>
       </section>
