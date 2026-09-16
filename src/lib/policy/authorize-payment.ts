@@ -18,6 +18,12 @@ export interface AuthorizationRequest {
   amountCents: number;
 }
 
+export interface FinalizeSettlementRequest {
+  paymentRequestId: string;
+  status: "simulated" | "settled";
+  transactionSignature?: string | null;
+}
+
 export async function authorizePaymentForTask(
   supabase: SupabaseClient,
   request: AuthorizationRequest
@@ -54,6 +60,7 @@ export async function authorizePaymentForTask(
     .select("amount_cents")
     .eq("agent_id", task.agent_id)
     .eq("decision", "approved")
+    .in("settlement_status", ["simulated", "settled"])
     .gte("created_at", rollingDayStart);
 
   if (spendError) {
@@ -96,6 +103,7 @@ export async function authorizePaymentForTask(
       decision: decision.approved ? "approved" : "rejected",
       decision_code: decision.code,
       reason: decision.reason,
+      settlement_status: decision.approved ? "authorized" : "not_applicable",
     })
     .select("id")
     .single();
@@ -116,22 +124,12 @@ export async function authorizePaymentForTask(
       amount_cents: request.amountCents,
       decision_code: decision.code,
       reason: decision.reason,
+      settlement_status: decision.approved ? "authorized" : "not_applicable",
     },
   });
 
   if (auditError) {
     throw new Error(auditError.message);
-  }
-
-  if (decision.approved) {
-    const { error: taskUpdateError } = await supabase
-      .from("tasks")
-      .update({ spent_cents: task.spent_cents + request.amountCents })
-      .eq("id", task.id);
-
-    if (taskUpdateError) {
-      throw new Error(taskUpdateError.message);
-    }
   }
 
   return {
@@ -140,4 +138,63 @@ export async function authorizePaymentForTask(
     agentId: task.agent_id,
     taskId: task.id,
   };
+}
+
+export async function finalizePaymentSettlement(
+  supabase: SupabaseClient,
+  request: FinalizeSettlementRequest
+) {
+  const { data, error } = await supabase.rpc("finalize_payment_settlement", {
+    p_payment_request_id: request.paymentRequestId,
+    p_settlement_status: request.status,
+    p_transaction_signature: request.transactionSignature ?? null,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
+export async function markPaymentSettlementFailed(
+  supabase: SupabaseClient,
+  paymentRequestId: string,
+  reason: string
+) {
+  const { data: payment, error: readError } = await supabase
+    .from("payment_requests")
+    .select("id,agent_id,task_id,settlement_status")
+    .eq("id", paymentRequestId)
+    .single();
+
+  if (readError || !payment) {
+    throw new Error(readError?.message ?? "Payment request not found");
+  }
+
+  if (payment.settlement_status !== "authorized") {
+    return;
+  }
+
+  const { error: updateError } = await supabase
+    .from("payment_requests")
+    .update({ settlement_status: "failed" })
+    .eq("id", paymentRequestId)
+    .eq("settlement_status", "authorized");
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  const { error: auditError } = await supabase.from("audit_events").insert({
+    agent_id: payment.agent_id,
+    task_id: payment.task_id,
+    payment_request_id: payment.id,
+    event_type: "payment_settlement_failed",
+    payload: { reason },
+  });
+
+  if (auditError) {
+    throw new Error(auditError.message);
+  }
 }
