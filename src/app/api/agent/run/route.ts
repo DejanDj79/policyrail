@@ -1,8 +1,14 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { DEMO_RESOURCES, getResourceById } from "@/lib/agent/resources";
-import { authorizePaymentForTask } from "@/lib/policy/authorize-payment";
+import {
+  authorizePaymentForTask,
+  finalizePaymentSettlement,
+  markPaymentSettlementFailed,
+} from "@/lib/policy/authorize-payment";
 import { createClient } from "@/lib/supabase/server";
+import { isX402Enabled } from "@/lib/x402/config";
+import { purchaseX402Resource } from "@/lib/x402/client";
 
 interface RunAgentBody {
   taskId?: string;
@@ -30,6 +36,8 @@ interface AttemptItem {
   approved: boolean;
   policyReason: string;
   decisionCode: string;
+  settlementStatus: "not_applicable" | "simulated" | "settled";
+  transactionSignature: string | null;
 }
 
 const MODEL = process.env.OPENAI_AGENT_MODEL ?? "gpt-5.6-luna";
@@ -152,6 +160,7 @@ export async function POST(request: Request) {
             resource_id: attempt.resourceId,
             approved: attempt.approved,
             policy_reason: attempt.policyReason,
+            settlement_status: attempt.settlementStatus,
           })),
         }),
         text: {
@@ -228,24 +237,108 @@ export async function POST(request: Request) {
         amountCents: resource.amountCents,
       });
 
+      if (!decision.approved) {
+        attempts.push({
+          resourceId: resource.id,
+          resourceName: resource.name,
+          amountCents: resource.amountCents,
+          agentRationale: choice.rationale,
+          approved: false,
+          policyReason: decision.reason,
+          decisionCode: decision.code,
+          settlementStatus: "not_applicable",
+          transactionSignature: null,
+        });
+        continue;
+      }
+
+      let acquiredContent = resource.content;
+      let settlementStatus: "simulated" | "settled" = "simulated";
+      let transactionSignature: string | null = null;
+
+      try {
+        if (isX402Enabled()) {
+          const resourceUrl = new URL(
+            `/api/x402/${resource.id}`,
+            request.url
+          ).toString();
+          const settlement = await purchaseX402Resource(
+            resourceUrl,
+            resource.amountCents
+          );
+
+          acquiredContent = settlement.content;
+          settlementStatus = "settled";
+          transactionSignature = settlement.transactionSignature;
+
+          await finalizePaymentSettlement(supabase, {
+            paymentRequestId: decision.paymentRequestId,
+            status: "settled",
+            transactionSignature,
+          });
+
+          const { error: settlementAuditError } = await supabase
+            .from("audit_events")
+            .insert({
+              agent_id: task.agent_id,
+              task_id: task.id,
+              payment_request_id: decision.paymentRequestId,
+              event_type: "payment_settled",
+              payload: {
+                protocol: "x402",
+                scheme: "exact",
+                network: settlement.network,
+                payer: settlement.payer,
+                provider: resource.provider,
+                resource: resource.resource,
+                amount_cents: resource.amountCents,
+                transaction_signature: transactionSignature,
+              },
+            });
+
+          if (settlementAuditError) {
+            throw new Error(settlementAuditError.message);
+          }
+        } else {
+          await finalizePaymentSettlement(supabase, {
+            paymentRequestId: decision.paymentRequestId,
+            status: "simulated",
+          });
+        }
+      } catch (settlementError) {
+        const settlementMessage =
+          settlementError instanceof Error
+            ? settlementError.message
+            : "Payment settlement failed";
+
+        await markPaymentSettlementFailed(
+          supabase,
+          decision.paymentRequestId,
+          settlementMessage
+        );
+        throw new Error(
+          `Policy approved ${resource.name}, but settlement failed: ${settlementMessage}`
+        );
+      }
+
       attempts.push({
         resourceId: resource.id,
         resourceName: resource.name,
         amountCents: resource.amountCents,
         agentRationale: choice.rationale,
-        approved: decision.approved,
+        approved: true,
         policyReason: decision.reason,
         decisionCode: decision.code,
+        settlementStatus,
+        transactionSignature,
       });
 
-      if (decision.approved) {
-        evidence.push({
-          resourceId: resource.id,
-          name: resource.name,
-          category: resource.category,
-          content: resource.content,
-        });
-      }
+      evidence.push({
+        resourceId: resource.id,
+        name: resource.name,
+        category: resource.category,
+        content: acquiredContent,
+      });
     }
 
     if (!finalAnswer) {
@@ -298,12 +391,16 @@ export async function POST(request: Request) {
           model: MODEL,
           result: finalAnswer,
           total_spent_cents: totalSpentCents,
+          settlement_mode: isX402Enabled() ? "x402-solana-devnet" : "simulated",
           approved_resources: attempts
             .filter((attempt) => attempt.approved)
             .map((attempt) => attempt.resourceId),
           rejected_resources: attempts
             .filter((attempt) => !attempt.approved)
             .map((attempt) => attempt.resourceId),
+          transactions: attempts
+            .filter((attempt) => attempt.transactionSignature)
+            .map((attempt) => attempt.transactionSignature),
         },
       });
 
@@ -316,6 +413,7 @@ export async function POST(request: Request) {
       taskId: task.id,
       finalAnswer,
       totalSpentCents,
+      settlementMode: isX402Enabled() ? "x402-solana-devnet" : "simulated",
       attempts,
     });
   } catch (error) {
