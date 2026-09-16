@@ -9,6 +9,8 @@ type Resource = {
   name: string;
   provider: string;
   resource: string;
+  domain: string;
+  tags: string[];
   category: string;
   amountCents: number;
   qualityScore: number;
@@ -35,6 +37,7 @@ function money(cents: number) {
 export default function ResourcesPage() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [query, setQuery] = useState("");
+  const [domain, setDomain] = useState("all");
   const [category, setCategory] = useState("all");
   const [maxPrice, setMaxPrice] = useState("all");
   const [sortMode, setSortMode] = useState<SortMode>("quality");
@@ -74,8 +77,13 @@ export default function ResourcesPage() {
     };
   }, []);
 
+  const domains = useMemo(
+    () => Array.from(new Set(resources.map((resource) => resource.domain))).sort(),
+    [resources]
+  );
+
   const categories = useMemo(
-    () => Array.from(new Set(resources.map((resource) => resource.category))),
+    () => Array.from(new Set(resources.map((resource) => resource.category))).sort(),
     [resources]
   );
 
@@ -88,11 +96,14 @@ export default function ResourcesPage() {
         !normalizedQuery ||
         resource.name.toLowerCase().includes(normalizedQuery) ||
         resource.provider.toLowerCase().includes(normalizedQuery) ||
+        resource.domain.toLowerCase().includes(normalizedQuery) ||
+        resource.tags.some((tag) => tag.toLowerCase().includes(normalizedQuery)) ||
         resource.description.toLowerCase().includes(normalizedQuery);
+      const matchesDomain = domain === "all" || resource.domain === domain;
       const matchesCategory = category === "all" || resource.category === category;
       const matchesPrice = priceLimit === null || resource.amountCents <= priceLimit;
 
-      return matchesQuery && matchesCategory && matchesPrice;
+      return matchesQuery && matchesDomain && matchesCategory && matchesPrice;
     });
 
     return [...result].sort((a, b) => {
@@ -100,7 +111,7 @@ export default function ResourcesPage() {
       if (sortMode === "price-high") return b.amountCents - a.amountCents;
       return b.qualityScore - a.qualityScore;
     });
-  }, [resources, query, category, maxPrice, sortMode]);
+  }, [resources, query, domain, category, maxPrice, sortMode]);
 
   const lowestPrice = resources.length
     ? Math.min(...resources.map((resource) => resource.amountCents))
@@ -128,10 +139,10 @@ export default function ResourcesPage() {
       <section className={styles.hero}>
         <div>
           <p className={styles.eyebrow}>RESOURCE DIRECTORY</p>
-          <h1>Know what the agent can buy.</h1>
+          <h1>Know what the agent can discover and buy.</h1>
           <p>
-            Browse the paid resources available to the procurement agent before PolicyRail evaluates
-            any purchase request.
+            Task-aware discovery searches this directory first. Only relevant resources move into the
+            procurement flow, where PolicyRail evaluates every proposed payment.
           </p>
         </div>
         <Link className={styles.primaryAction} href="/tasks/new">
@@ -145,8 +156,8 @@ export default function ResourcesPage() {
           <strong>{resources.length}</strong>
         </div>
         <div>
-          <span>Categories</span>
-          <strong>{categories.length}</strong>
+          <span>Domains</span>
+          <strong>{domains.length}</strong>
         </div>
         <div>
           <span>Price range</span>
@@ -166,8 +177,8 @@ export default function ResourcesPage() {
           <strong>Transparent demo resources, real payment flow.</strong>
         </div>
         <p>
-          Resource metadata and purchased content are synthetic for the hackathon demo. Policy
-          authorization, x402 payment handling, Solana Devnet settlement and audit records are real.
+          Resource metadata and purchased content are synthetic for the hackathon demo. Discovery,
+          policy authorization, x402 payment handling, Solana Devnet settlement and audit records are real.
         </p>
       </section>
 
@@ -175,9 +186,16 @@ export default function ResourcesPage() {
         <input
           type="search"
           value={query}
-          placeholder="Search provider, resource or capability…"
+          placeholder="Search provider, resource, domain or capability…"
           onChange={(event) => setQuery(event.target.value)}
         />
+
+        <select value={domain} onChange={(event) => setDomain(event.target.value)}>
+          <option value="all">All domains</option>
+          {domains.map((item) => (
+            <option value={item} key={item}>{item}</option>
+          ))}
+        </select>
 
         <select value={category} onChange={(event) => setCategory(event.target.value)}>
           <option value="all">All categories</option>
@@ -223,10 +241,9 @@ export default function ResourcesPage() {
               <p className={styles.description}>{resource.description}</p>
 
               <div className={styles.tags}>
+                <span>{resource.domain}</span>
                 <span>{resource.category}</span>
-                <span>{resource.paymentProtocol}</span>
-                <span>{resource.currency}</span>
-                <span>Devnet</span>
+                {resource.tags.slice(0, 2).map((tag) => <span key={tag}>{tag}</span>)}
               </div>
 
               <div className={styles.qualityRow}>
@@ -244,7 +261,7 @@ export default function ResourcesPage() {
                   <span>Resource ID</span>
                   <code>{resource.id}</code>
                 </div>
-                <span className={styles.available}>AVAILABLE</span>
+                <span className={styles.available}>x402 READY</span>
               </div>
             </article>
           ))}
@@ -253,14 +270,15 @@ export default function ResourcesPage() {
 
       <section className={styles.nextStep}>
         <div>
-          <p className={styles.eyebrow}>NEXT EVOLUTION</p>
-          <h2>Directory today. Discovery next.</h2>
+          <p className={styles.eyebrow}>TASK-AWARE DISCOVERY</p>
+          <h2>One directory. Different resources for different tasks.</h2>
           <p>
-            This page shows the exact catalog the agent can currently purchase from. The next step is
-            replacing the fixed catalog with provider registration and task-aware resource discovery.
+            Inference research now discovers only inference resources, while travel tasks discover hotel
+            inventory, review and location data. Procurement still happens only after discovery and every
+            payment remains subject to the active PolicyRail policy.
           </p>
         </div>
-        <Link href="/tasks/new">Run against this catalog →</Link>
+        <Link href="/tasks/new">Run a discovery task →</Link>
       </section>
     </main>
   );
