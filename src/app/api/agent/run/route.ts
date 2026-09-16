@@ -1,12 +1,12 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { discoverResourcesForTask } from "@/lib/agent/discover-resources";
-import { DEMO_RESOURCES, getResourceById } from "@/lib/agent/resources";
 import {
   authorizePaymentForTask,
   finalizePaymentSettlement,
   markPaymentSettlementFailed,
 } from "@/lib/policy/authorize-payment";
+import { getResourceRegistry } from "@/lib/resources/registry";
 import { createClient } from "@/lib/supabase/server";
 import { isX402Enabled } from "@/lib/x402/config";
 import { purchaseX402Resource } from "@/lib/x402/client";
@@ -97,6 +97,8 @@ export async function POST(request: Request) {
   }
 
   const openai = new OpenAI({ apiKey });
+  const registry = getResourceRegistry();
+  const catalog = await registry.listResources();
   const attemptedIds = new Set<string>();
   const evidence: EvidenceItem[] = [];
   const attempts: AttemptItem[] = [];
@@ -106,7 +108,7 @@ export async function POST(request: Request) {
     const discovery = await discoverResourcesForTask(
       openai,
       task.prompt,
-      DEMO_RESOURCES,
+      catalog,
       MODEL
     );
 
@@ -118,6 +120,9 @@ export async function POST(request: Request) {
         event_type: "resource_discovery_completed",
         payload: {
           model: MODEL,
+          registry_id: registry.info.id,
+          registry_kind: registry.info.kind,
+          registry_version: registry.info.version,
           task_supported: discovery.taskSupported,
           resource_ids: discovery.resourceIds,
           resource_count: discovery.resourceIds.length,
@@ -177,6 +182,7 @@ export async function POST(request: Request) {
           task: task.prompt,
           task_budget_cents: task.budget_cents,
           discovery: {
+            registry_id: registry.info.id,
             rationale: discovery.rationale,
             confidence: discovery.confidence,
             resource_ids: discovery.resourceIds,
@@ -242,7 +248,7 @@ export async function POST(request: Request) {
         throw new Error("The AI agent returned an invalid resource choice.");
       }
 
-      const resource = getResourceById(choice.resource_id);
+      const resource = await registry.getResourceById(choice.resource_id);
 
       if (
         !resource ||
@@ -262,6 +268,7 @@ export async function POST(request: Request) {
           event_type: "agent_resource_proposed",
           payload: {
             model: MODEL,
+            registry_id: registry.info.id,
             resource_id: resource.id,
             resource_name: resource.name,
             provider: resource.provider,
@@ -305,10 +312,9 @@ export async function POST(request: Request) {
 
       try {
         if (isX402Enabled()) {
-          const resourceUrl = new URL(
-            `/api/x402/${resource.id}`,
-            request.url
-          ).toString();
+          const resourceUrl =
+            resource.purchaseUrl ??
+            new URL(`/api/x402/${resource.id}`, request.url).toString();
           const settlement = await purchaseX402Resource(
             resourceUrl,
             resource.amountCents
@@ -336,6 +342,8 @@ export async function POST(request: Request) {
                 scheme: "exact",
                 network: settlement.network,
                 payer: settlement.payer,
+                registry_id: registry.info.id,
+                purchase_target: resource.purchaseUrl ? "external" : "policyrail-proxy",
                 provider: resource.provider,
                 resource: resource.resource,
                 amount_cents: resource.amountCents,
@@ -436,6 +444,9 @@ export async function POST(request: Request) {
         event_type: "task_completed",
         payload: {
           model: MODEL,
+          registry_id: registry.info.id,
+          registry_kind: registry.info.kind,
+          registry_version: registry.info.version,
           result: finalAnswer,
           total_spent_cents: totalSpentCents,
           settlement_mode: isX402Enabled() ? "x402-solana-devnet" : "simulated",
@@ -459,6 +470,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       model: MODEL,
       taskId: task.id,
+      registry: registry.info,
       discovery: {
         taskSupported: discovery.taskSupported,
         resourceIds: discovery.resourceIds,
