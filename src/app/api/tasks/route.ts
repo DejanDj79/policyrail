@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 interface CreateTaskBody {
   agentId?: string;
   prompt?: string;
+  budgetCents?: number;
 }
 
 interface CompleteTaskBody {
@@ -14,8 +15,9 @@ interface CompleteTaskBody {
 export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
 
-  if (!claimsData?.claims?.sub) {
+  if (!userId) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
 
@@ -27,35 +29,83 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  if (!body.agentId || !body.prompt?.trim()) {
+  const prompt = body.prompt?.trim();
+
+  if (!body.agentId || !prompt) {
     return NextResponse.json({ error: "agentId and prompt are required" }, { status: 400 });
+  }
+
+  if (prompt.length > 4000) {
+    return NextResponse.json({ error: "Task is too long. Keep it under 4000 characters." }, { status: 400 });
+  }
+
+  const { data: agent, error: agentError } = await supabase
+    .from("agents")
+    .select("id")
+    .eq("id", body.agentId)
+    .eq("user_id", userId)
+    .single();
+
+  if (agentError || !agent) {
+    return NextResponse.json({ error: "Agent not found" }, { status: 404 });
   }
 
   const { data: policy, error: policyError } = await supabase
     .from("policies")
     .select("task_budget_cents")
-    .eq("agent_id", body.agentId)
+    .eq("agent_id", agent.id)
     .single();
 
-  if (policyError) {
+  if (policyError || !policy) {
     return NextResponse.json({ error: "Agent policy not found" }, { status: 404 });
+  }
+
+  const requestedBudget = body.budgetCents ?? policy.task_budget_cents;
+
+  if (!Number.isInteger(requestedBudget) || requestedBudget <= 0) {
+    return NextResponse.json({ error: "Task budget must be a positive whole-cent amount." }, { status: 400 });
+  }
+
+  if (requestedBudget > policy.task_budget_cents) {
+    return NextResponse.json(
+      {
+        error: `Task budget cannot exceed the agent policy limit of $${(
+          policy.task_budget_cents / 100
+        ).toFixed(2)}.`,
+      },
+      { status: 400 }
+    );
   }
 
   const { data: task, error: taskError } = await supabase
     .from("tasks")
     .insert({
-      agent_id: body.agentId,
-      prompt: body.prompt.trim(),
-      budget_cents: policy.task_budget_cents,
+      agent_id: agent.id,
+      prompt,
+      budget_cents: requestedBudget,
       spent_cents: 0,
       status: "running",
     })
-    .select("id,agent_id,prompt,budget_cents,spent_cents,status")
+    .select("id,agent_id,prompt,budget_cents,spent_cents,status,created_at")
     .single();
 
-  if (taskError) {
-    return NextResponse.json({ error: taskError.message }, { status: 500 });
+  if (taskError || !task) {
+    return NextResponse.json(
+      { error: taskError?.message ?? "Could not create task" },
+      { status: 500 }
+    );
   }
+
+  await supabase.from("audit_events").insert({
+    agent_id: agent.id,
+    task_id: task.id,
+    event_type: "task_created",
+    payload: {
+      prompt,
+      budget_cents: requestedBudget,
+      policy_task_budget_cents: policy.task_budget_cents,
+    },
+  });
 
   return NextResponse.json({ task });
 }
