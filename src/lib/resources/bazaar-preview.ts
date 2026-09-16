@@ -6,6 +6,7 @@ import {
 
 const SAMPLE_LIMIT = 100;
 const ATOMIC_USDC_PER_CENT = BigInt(10_000);
+const DISTRIBUTION_LIMIT = 8;
 
 type BazaarRequirement = {
   scheme?: unknown;
@@ -27,6 +28,11 @@ export interface BazaarPreviewResource {
   method: "GET";
   amountCents: number;
   description: string;
+}
+
+export interface BazaarDistributionEntry {
+  value: string;
+  count: number;
 }
 
 export interface BazaarPreviewResult {
@@ -54,6 +60,12 @@ export interface BazaarPreviewResult {
     noExactDevnetUsdc: number;
     unsupportedMethod: number;
     subCentOrInvalidPrice: number;
+  };
+  breakdown: {
+    paymentOptions: number;
+    networks: BazaarDistributionEntry[];
+    schemes: BazaarDistributionEntry[];
+    assets: BazaarDistributionEntry[];
   };
   resources: BazaarPreviewResource[];
 }
@@ -109,6 +121,18 @@ function methodFor(item: BazaarItem) {
   return stringValue(input?.method)?.toUpperCase() ?? "GET";
 }
 
+function increment(map: Map<string, number>, value: unknown) {
+  const key = stringValue(value) ?? "(missing)";
+  map.set(key, (map.get(key) ?? 0) + 1);
+}
+
+function topDistribution(map: Map<string, number>): BazaarDistributionEntry[] {
+  return Array.from(map.entries())
+    .map(([value, count]) => ({ value, count }))
+    .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
+    .slice(0, DISTRIBUTION_LIMIT);
+}
+
 export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
   const catalog = await fetchBazaarCatalog(SAMPLE_LIMIT);
   const items = catalog.items;
@@ -116,6 +140,10 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
   let http = 0;
   let exactDevnetUsdc = 0;
   let get = 0;
+  let paymentOptions = 0;
+  const networkCounts = new Map<string, number>();
+  const schemeCounts = new Map<string, number>();
+  const assetCounts = new Map<string, number>();
   const excluded = {
     invalidOrNonHttp: 0,
     noExactDevnetUsdc: 0,
@@ -153,6 +181,18 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
 
     http += 1;
 
+    const method = methodFor(item);
+    if (method === "GET") get += 1;
+
+    for (const rawRequirement of item.accepts) {
+      if (!isRecord(rawRequirement)) continue;
+      const requirement = rawRequirement as BazaarRequirement;
+      paymentOptions += 1;
+      increment(networkCounts, requirement.network);
+      increment(schemeCounts, requirement.scheme);
+      increment(assetCounts, requirement.asset);
+    }
+
     const requirement = (item.accepts as BazaarRequirement[]).find(
       (candidate) =>
         candidate?.scheme === "exact" &&
@@ -168,13 +208,10 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
 
     exactDevnetUsdc += 1;
 
-    const method = methodFor(item);
     if (method !== "GET") {
       excluded.unsupportedMethod += 1;
       continue;
     }
-
-    get += 1;
 
     const amountCents = wholeCentsFromAtomicUsdc(requirement.amount);
     if (amountCents === null) {
@@ -212,6 +249,12 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
       compatible: compatible.length,
     },
     excluded,
+    breakdown: {
+      paymentOptions,
+      networks: topDistribution(networkCounts),
+      schemes: topDistribution(schemeCounts),
+      assets: topDistribution(assetCounts),
+    },
     resources: compatible.slice(0, 12),
   };
 }
