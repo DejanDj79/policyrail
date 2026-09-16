@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import probeLayout from "./bazaar-probe-layout.module.css";
 import styles from "./bazaar-preview.module.css";
 
 type PreviewResource = {
@@ -329,7 +330,7 @@ export default function BazaarPreview() {
                 </div>
               </div>
 
-              <div className={styles.probePanel}>
+              <div className={`${styles.probePanel} ${probeLayout.probePanel}`}>
                 <div>
                   <span>LIVE x402 HANDSHAKE CHECK</span>
                   <strong>Probe the cent-ledger candidates without paying.</strong>
@@ -339,7 +340,7 @@ export default function BazaarPreview() {
                 </div>
                 <button
                   type="button"
-                  className={styles.probeButton}
+                  className={`${styles.probeButton} ${probeLayout.probeButton}`}
                   onClick={runDryRunProbe}
                   disabled={probeLoading || preview.solanaMainnet.wholeCentResources === 0}
                 >
