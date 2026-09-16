@@ -28,6 +28,8 @@ type AgentAttempt = {
   approved: boolean;
   policyReason: string;
   decisionCode: string;
+  settlementStatus: "not_applicable" | "simulated" | "settled";
+  transactionSignature: string | null;
 };
 
 type AgentRunPayload = {
@@ -35,11 +37,17 @@ type AgentRunPayload = {
   taskId?: string;
   finalAnswer?: string;
   totalSpentCents?: number;
+  settlementMode?: "simulated" | "x402-solana-devnet";
   attempts?: AgentAttempt[];
   error?: string;
 };
 
 const taskPrompt = "Compare AI inference providers and recommend the best value.";
+
+function shortSignature(signature: string) {
+  if (signature.length <= 20) return signature;
+  return `${signature.slice(0, 10)}…${signature.slice(-8)}`;
+}
 
 export default function Home() {
   const [supabase] = useState(() => createClient());
@@ -49,6 +57,9 @@ export default function Home() {
   const [events, setEvents] = useState<AgentAttempt[]>([]);
   const [finalAnswer, setFinalAnswer] = useState<string | null>(null);
   const [model, setModel] = useState<string | null>(null);
+  const [settlementMode, setSettlementMode] = useState<
+    "simulated" | "x402-solana-devnet" | null
+  >(null);
   const [running, setRunning] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +120,7 @@ export default function Home() {
     setSpent(0);
     setFinalAnswer(null);
     setModel(null);
+    setSettlementMode(null);
     setError(null);
     setRunning(true);
 
@@ -154,6 +166,7 @@ export default function Home() {
       setSpent(agentPayload.totalSpentCents ?? localSpent);
       setFinalAnswer(agentPayload.finalAnswer ?? null);
       setModel(agentPayload.model ?? null);
+      setSettlementMode(agentPayload.settlementMode ?? "simulated");
     } catch (runError) {
       setError(
         runError instanceof Error ? runError.message : "The demo task failed."
@@ -225,6 +238,16 @@ export default function Home() {
           {model ? (
             <p className="modelNote">
               Decision model: <strong>{model}</strong>
+              {settlementMode ? (
+                <>
+                  {" · "}
+                  Settlement: <strong>
+                    {settlementMode === "x402-solana-devnet"
+                      ? "x402 / Solana Devnet"
+                      : "simulated"}
+                  </strong>
+                </>
+              ) : null}
             </p>
           ) : null}
 
@@ -253,7 +276,7 @@ export default function Home() {
           <div className="panelHeader">
             <div>
               <p className="label">LIVE AUDIT TRAIL</p>
-              <h2>Agent intent → policy decision</h2>
+              <h2>Agent intent → policy → settlement</h2>
             </div>
           </div>
 
@@ -283,6 +306,26 @@ export default function Home() {
                     <span>PolicyRail</span>
                     <p>{event.policyReason}</p>
                   </div>
+
+                  {event.approved ? (
+                    <div className="decisionDetail settlementDetail">
+                      <span>Settlement</span>
+                      <p>
+                        {event.settlementStatus === "settled"
+                          ? "SETTLED · x402 exact · Solana Devnet"
+                          : "SIMULATED · wallet signing disabled"}
+                      </p>
+                      {event.transactionSignature ? (
+                        <a
+                          href={`https://explorer.solana.com/tx/${event.transactionSignature}?cluster=devnet`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {shortSignature(event.transactionSignature)} ↗
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -295,7 +338,7 @@ export default function Home() {
         <b>→</b>
         <span>PolicyRail authorization</span>
         <b>→</b>
-        <span>Solana settlement</span>
+        <span>x402 / Solana settlement</span>
       </section>
     </main>
   );
