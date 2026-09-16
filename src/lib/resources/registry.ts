@@ -76,10 +76,16 @@ function deriveCategory(text: string): SpendingCategory {
 function centsFromAtomicUsdc(amount: string) {
   try {
     const atomic = BigInt(amount);
-    if (atomic <= 0n) return null;
-    const cents = (atomic + 9_999n) / 10_000n;
+    const zero = BigInt(0);
+    const atomicPerCent = BigInt(10_000);
+
+    // PolicyRail's current ledger stores integer cents. Ignore sub-cent or
+    // fractional-cent Bazaar prices until the ledger moves to atomic USDC units.
+    if (atomic <= zero || atomic % atomicPerCent !== zero) return null;
+
+    const cents = atomic / atomicPerCent;
     if (cents > BigInt(Number.MAX_SAFE_INTEGER)) return null;
-    return Math.max(1, Number(cents));
+    return Number(cents);
   } catch {
     return null;
   }
