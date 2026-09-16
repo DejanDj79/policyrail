@@ -1,27 +1,17 @@
 import { NextResponse } from "next/server";
-import { DEMO_RESOURCES } from "@/lib/agent/resources";
+import {
+  getResourceRegistry,
+  toPublicResourceMetadata,
+} from "@/lib/resources/registry";
 
 export async function GET() {
-  const resources = DEMO_RESOURCES.map((resource) => ({
-    id: resource.id,
-    name: resource.name,
-    provider: resource.provider,
-    resource: resource.resource,
-    domain: resource.domain,
-    tags: resource.tags,
-    category: resource.category,
-    amountCents: resource.amountCents,
-    qualityScore: resource.qualityScore,
-    description: resource.description,
-    synthetic: true,
-    paymentProtocol: "x402",
-    settlementNetwork: "Solana Devnet",
-    currency: "USDC",
-  }));
+  const registry = getResourceRegistry();
+  const resources = (await registry.listResources()).map(toPublicResourceMetadata);
 
   return NextResponse.json({
     catalog: "PolicyRail MVP Resource Directory",
-    catalogVersion: "synthetic-v2",
+    catalogVersion: registry.info.version,
+    registry: registry.info,
     resources,
   });
 }
