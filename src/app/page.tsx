@@ -3,15 +3,6 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-type Decision = {
-  approved: boolean;
-  code: string;
-  reason: string;
-  remainingTaskBudgetCents: number;
-  remainingDailyBudgetCents: number;
-  paymentRequestId: string;
-};
-
 type Agent = {
   id: string;
   name: string;
@@ -29,40 +20,35 @@ type Policy = {
   blocked_providers: string[];
 };
 
-const taskPrompt = "Compare AI inference providers and recommend the best value.";
+type AgentAttempt = {
+  resourceId: string;
+  resourceName: string;
+  amountCents: number;
+  agentRationale: string;
+  approved: boolean;
+  policyReason: string;
+  decisionCode: string;
+};
 
-const examples = [
-  {
-    name: "Search dataset",
-    provider: "SearchGrid",
-    resource: "market-search",
-    category: "search",
-    amountCents: 2,
-  },
-  {
-    name: "Premium benchmark",
-    provider: "BenchPrime",
-    resource: "premium-benchmark",
-    category: "data",
-    amountCents: 25,
-  },
-  {
-    name: "Alternative benchmark",
-    provider: "ValueBench",
-    resource: "benchmark-lite",
-    category: "data",
-    amountCents: 7,
-  },
-] as const;
+type AgentRunPayload = {
+  model?: string;
+  taskId?: string;
+  finalAnswer?: string;
+  totalSpentCents?: number;
+  attempts?: AgentAttempt[];
+  error?: string;
+};
+
+const taskPrompt = "Compare AI inference providers and recommend the best value.";
 
 export default function Home() {
   const [supabase] = useState(() => createClient());
   const [agent, setAgent] = useState<Agent | null>(null);
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [spent, setSpent] = useState(0);
-  const [events, setEvents] = useState<
-    Array<(typeof examples)[number] & { decision: Decision }>
-  >([]);
+  const [events, setEvents] = useState<AgentAttempt[]>([]);
+  const [finalAnswer, setFinalAnswer] = useState<string | null>(null);
+  const [model, setModel] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +107,8 @@ export default function Home() {
 
     setEvents([]);
     setSpent(0);
+    setFinalAnswer(null);
+    setModel(null);
     setError(null);
     setRunning(true);
 
@@ -140,46 +128,32 @@ export default function Home() {
         throw new Error(taskPayload.error ?? "Could not create task.");
       }
 
-      let localSpent = 0;
+      const agentResponse = await fetch("/api/agent/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: taskPayload.task.id }),
+      });
 
-      for (const resource of examples) {
-        const response = await fetch("/api/policy/evaluate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            taskId: taskPayload.task.id,
-            provider: resource.provider,
-            resource: resource.resource,
-            category: resource.category,
-            amountCents: resource.amountCents,
-          }),
-        });
+      const agentPayload = (await agentResponse.json()) as AgentRunPayload;
 
-        const decision = (await response.json()) as Decision & { error?: string };
-
-        if (!response.ok) {
-          throw new Error(decision.error ?? "Policy evaluation failed.");
-        }
-
-        setEvents((current) => [...current, { ...resource, decision }]);
-
-        if (decision.approved) {
-          localSpent += resource.amountCents;
-          setSpent(localSpent);
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 550));
+      if (!agentResponse.ok || !agentPayload.attempts) {
+        throw new Error(agentPayload.error ?? "AI agent execution failed.");
       }
 
-      await fetch("/api/tasks", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskId: taskPayload.task.id,
-          result:
-            "ValueBench provides the best value for this task while remaining within PolicyRail spending constraints.",
-        }),
-      });
+      let localSpent = 0;
+
+      for (const attempt of agentPayload.attempts) {
+        setEvents((current) => [...current, attempt]);
+        if (attempt.approved) {
+          localSpent += attempt.amountCents;
+          setSpent(localSpent);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 650));
+      }
+
+      setSpent(agentPayload.totalSpentCents ?? localSpent);
+      setFinalAnswer(agentPayload.finalAnswer ?? null);
+      setModel(agentPayload.model ?? null);
     } catch (runError) {
       setError(
         runError instanceof Error ? runError.message : "The demo task failed."
@@ -216,7 +190,7 @@ export default function Home() {
         <div className="panel">
           <div className="panelHeader">
             <div>
-              <p className="label">DEMO AGENT</p>
+              <p className="label">AUTONOMOUS AGENT</p>
               <h2>{agent?.name ?? "ResearchBot"}</h2>
             </div>
             <div className="status">
@@ -248,6 +222,12 @@ export default function Home() {
             <p>{taskPrompt}</p>
           </div>
 
+          {model ? (
+            <p className="modelNote">
+              Decision model: <strong>{model}</strong>
+            </p>
+          ) : null}
+
           {error ? <p className="errorMessage">{error}</p> : null}
 
           <button
@@ -257,43 +237,52 @@ export default function Home() {
             {initializing
               ? "Connecting to policy store…"
               : running
-                ? "Agent running…"
-                : "Run policy demo"}
+                ? "AI agent reasoning…"
+                : "Run autonomous agent"}
           </button>
+
+          {finalAnswer ? (
+            <div className="resultCard">
+              <span>Agent result</span>
+              <p>{finalAnswer}</p>
+            </div>
+          ) : null}
         </div>
 
         <div className="panel audit">
           <div className="panelHeader">
             <div>
               <p className="label">LIVE AUDIT TRAIL</p>
-              <h2>Policy decisions</h2>
+              <h2>Agent intent → policy decision</h2>
             </div>
           </div>
 
           {events.length === 0 ? (
             <div className="empty">
-              {initializing
-                ? "Connecting to the PolicyRail data layer…"
-                : "Run the demo to watch PolicyRail evaluate and persist autonomous purchases."}
+              Run the agent to watch AI procurement decisions get evaluated by
+              deterministic spending policy.
             </div>
           ) : (
             <div className="events">
               {events.map((event, index) => (
-                <div className="event" key={`${event.resource}-${index}`}>
+                <div className="event" key={`${event.resourceId}-${index}`}>
                   <div>
-                    <strong>{event.name}</strong>
-                    <span>
-                      {event.provider} · ${(event.amountCents / 100).toFixed(2)}
-                    </span>
+                    <strong>{event.resourceName}</strong>
+                    <span>${(event.amountCents / 100).toFixed(2)} proposal</span>
                   </div>
-                  <div
-                    className={
-                      event.decision.approved ? "approved" : "rejected"
-                    }
-                  >
-                    {event.decision.approved ? "APPROVED" : "REJECTED"}
+                  <div className={event.approved ? "approved" : "rejected"}>
+                    {event.approved ? "APPROVED" : "REJECTED"}
                   </div>
-                  <p>{event.decision.reason}</p>
+
+                  <div className="decisionDetail">
+                    <span>AI rationale</span>
+                    <p>{event.agentRationale}</p>
+                  </div>
+
+                  <div className="decisionDetail policyDetail">
+                    <span>PolicyRail</span>
+                    <p>{event.policyReason}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -302,9 +291,9 @@ export default function Home() {
       </section>
 
       <section className="flow">
-        <span>Agent intent</span>
+        <span>AI procurement intent</span>
         <b>→</b>
-        <span>PolicyRail</span>
+        <span>PolicyRail authorization</span>
         <b>→</b>
         <span>Solana settlement</span>
       </section>
