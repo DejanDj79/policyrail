@@ -4,7 +4,10 @@ import {
   type PaidResource,
 } from "@/lib/agent/resources";
 import type { SpendingCategory } from "@/lib/policy/types";
-import { SOLANA_DEVNET_NETWORK } from "@/lib/x402/config";
+import {
+  SOLANA_DEVNET_NETWORK,
+  SOLANA_DEVNET_USDC_MINT,
+} from "@/lib/x402/config";
 
 export type ResourceRegistryKind = "local-demo" | "external" | "hybrid";
 export type ResourceRegistryMode = "local-demo" | "bazaar" | "hybrid";
@@ -128,6 +131,7 @@ function mapBazaarItem(item: BazaarItem): RegistryResource | null {
     (candidate) =>
       candidate?.scheme === "exact" &&
       candidate?.network === SOLANA_DEVNET_NETWORK &&
+      candidate?.asset === SOLANA_DEVNET_USDC_MINT &&
       typeof candidate?.amount === "string"
   );
 
@@ -204,8 +208,6 @@ class BazaarResourceRegistry implements ResourceRegistry {
       "https://x402.org/facilitator";
     const endpoint = new URL(`${facilitatorUrl.replace(/\/$/, "")}/discovery/resources`);
     endpoint.searchParams.set("type", "http");
-    endpoint.searchParams.set("scheme", "exact");
-    endpoint.searchParams.set("network", SOLANA_DEVNET_NETWORK);
     endpoint.searchParams.set("limit", "100");
 
     const response = await fetch(endpoint, {
