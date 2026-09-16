@@ -188,6 +188,7 @@ export default function NewTaskPage() {
         <div className={styles.navLinks}>
           <Link href="/dashboard">Dashboard</Link>
           <Link className={styles.active} href="/tasks/new">New task</Link>
+          <Link href="/activity">Activity</Link>
           <Link href="/policy">Agent policy</Link>
         </div>
       </nav>
@@ -348,7 +349,7 @@ export default function NewTaskPage() {
 
           <div className={styles.resultActions}>
             <Link href="/dashboard">Back to dashboard</Link>
-            {taskId ? <span>Task {taskId.slice(0, 8)}</span> : null}
+            {taskId ? <Link href={`/activity/${taskId}`}>View full audit →</Link> : null}
           </div>
         </section>
       ) : null}
