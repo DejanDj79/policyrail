@@ -11,6 +11,15 @@ type PreviewResource = {
   description: string;
 };
 
+type MainnetPreviewResource = {
+  resource: string;
+  provider: string;
+  method: "GET";
+  priceUsdc: string;
+  ledgerCompatible: boolean;
+  description: string;
+};
+
 type DistributionEntry = {
   value: string;
   count: number;
@@ -39,6 +48,16 @@ type PreviewPayload = {
     networks: DistributionEntry[];
     schemes: DistributionEntry[];
     assets: DistributionEntry[];
+  };
+  solanaMainnet?: {
+    readOnly: true;
+    network: string;
+    asset: string;
+    exactUsdcResources: number;
+    getResources: number;
+    wholeCentResources: number;
+    fractionalCentResources: number;
+    resources: MainnetPreviewResource[];
   };
   resources?: PreviewResource[];
   error?: string;
@@ -194,6 +213,69 @@ export default function BazaarPreview() {
                 <DistributionList title="Schemes" entries={preview.breakdown.schemes} />
                 <DistributionList title="Assets" entries={preview.breakdown.assets} />
               </div>
+            </section>
+          ) : null}
+
+          {preview.solanaMainnet ? (
+            <section className={styles.mainnetPreview}>
+              <div className={styles.mainnetHeader}>
+                <div>
+                  <div className={styles.mainnetKickerRow}>
+                    <span>SOLANA MAINNET FIT</span>
+                    <strong>READ ONLY</strong>
+                  </div>
+                  <h3>How much of the live Bazaar could PolicyRail understand on mainnet?</h3>
+                  <p>
+                    This is compatibility analysis only. No wallet, payment authorization or settlement is used.
+                  </p>
+                </div>
+                <code title={preview.solanaMainnet.network}>
+                  {compactIdentifier(preview.solanaMainnet.network)}
+                </code>
+              </div>
+
+              <div className={styles.mainnetStats}>
+                <div>
+                  <span>Exact + USDC</span>
+                  <strong>{preview.solanaMainnet.exactUsdcResources}</strong>
+                </div>
+                <div>
+                  <span>GET ready</span>
+                  <strong>{preview.solanaMainnet.getResources}</strong>
+                </div>
+                <div>
+                  <span>Current cent ledger</span>
+                  <strong>{preview.solanaMainnet.wholeCentResources}</strong>
+                </div>
+                <div>
+                  <span>Atomic ledger needed</span>
+                  <strong>{preview.solanaMainnet.fractionalCentResources}</strong>
+                </div>
+              </div>
+
+              {preview.solanaMainnet.resources.length > 0 ? (
+                <div className={styles.mainnetResources}>
+                  {preview.solanaMainnet.resources.map((resource) => (
+                    <article key={`mainnet-${resource.provider}-${resource.resource}`}>
+                      <div className={styles.mainnetResourceTop}>
+                        <span>{resource.provider}</span>
+                        <strong>{resource.method} · {resource.priceUsdc} USDC</strong>
+                      </div>
+                      <p>{resource.description}</p>
+                      <div className={styles.mainnetResourceFooter}>
+                        <code>{resource.resource}</code>
+                        <span className={resource.ledgerCompatible ? styles.ledgerReady : styles.atomicNeeded}>
+                          {resource.ledgerCompatible ? "CENT LEDGER OK" : "ATOMIC LEDGER NEEDED"}
+                        </span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className={styles.mainnetEmpty}>
+                  No sampled resource advertises exact Solana mainnet USDC with a GET endpoint.
+                </div>
+              )}
             </section>
           ) : null}
 
