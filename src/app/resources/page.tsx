@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import BazaarPreview from "./BazaarPreview";
 import styles from "./resources.module.css";
 
 type Resource = {
@@ -25,7 +26,7 @@ type Resource = {
 type RegistryInfo = {
   id: string;
   name: string;
-  kind: "local-demo" | "external";
+  kind: "local-demo" | "external" | "hybrid";
   synthetic: boolean;
   version: string;
 };
@@ -188,7 +189,11 @@ export default function ResourcesPage() {
       <section className={styles.disclosure}>
         <div>
           <span className={styles.syntheticBadge}>
-            {registry?.kind === "external" ? "EXTERNAL REGISTRY" : "LOCAL DEMO REGISTRY"}
+            {registry?.kind === "external"
+              ? "EXTERNAL REGISTRY"
+              : registry?.kind === "hybrid"
+                ? "HYBRID REGISTRY"
+                : "LOCAL DEMO REGISTRY"}
           </span>
           <strong>{registry?.name ?? "PolicyRail Resource Registry"}</strong>
         </div>
@@ -198,6 +203,8 @@ export default function ResourcesPage() {
           Devnet settlement and audit records are real.
         </p>
       </section>
+
+      <BazaarPreview />
 
       <section className={styles.filters}>
         <input
