@@ -154,7 +154,8 @@ export default function DashboardPage() {
         </Link>
         <div className={styles.navLinks}>
           <Link className={styles.active} href="/dashboard">Dashboard</Link>
-          <Link href="/">Agent run</Link>
+          <Link href="/tasks/new">New task</Link>
+          <Link href="/activity">Activity</Link>
           <Link href="/policy">Agent policy</Link>
         </div>
       </nav>
@@ -169,7 +170,7 @@ export default function DashboardPage() {
         </div>
         <div className={styles.heroActions}>
           <Link className={styles.secondaryAction} href="/policy">Edit policy</Link>
-          <Link className={styles.primaryAction} href="/">Run agent</Link>
+          <Link className={styles.primaryAction} href="/tasks/new">New task</Link>
         </div>
       </section>
 
@@ -264,6 +265,7 @@ export default function DashboardPage() {
                   <p className={styles.label}>RECENT TASKS</p>
                   <h2>Autonomous runs</h2>
                 </div>
+                <Link className={styles.secondaryAction} href="/activity">View all</Link>
               </div>
 
               {data.recentTasks.length === 0 ? (
@@ -271,21 +273,27 @@ export default function DashboardPage() {
               ) : (
                 <div className={styles.taskList}>
                   {data.recentTasks.map((task) => (
-                    <div className={styles.taskItem} key={task.id}>
-                      <div className={styles.taskTop}>
-                        <div className={styles.taskTitle}>
-                          <strong>{task.prompt}</strong>
-                          <span className={styles.taskMeta}>
-                            {task.status.toUpperCase()} · {dateLabel(task.created_at)}
-                          </span>
+                    <Link
+                      href={`/activity/${task.id}`}
+                      key={task.id}
+                      style={{ color: "inherit", textDecoration: "none" }}
+                    >
+                      <div className={styles.taskItem}>
+                        <div className={styles.taskTop}>
+                          <div className={styles.taskTitle}>
+                            <strong>{task.prompt}</strong>
+                            <span className={styles.taskMeta}>
+                              {task.status.toUpperCase()} · {dateLabel(task.created_at)}
+                            </span>
+                          </div>
+                          <div className={styles.taskSpend}>
+                            <strong>{money(task.spent_cents)}</strong>
+                            <span>of {money(task.budget_cents)}</span>
+                          </div>
                         </div>
-                        <div className={styles.taskSpend}>
-                          <strong>{money(task.spent_cents)}</strong>
-                          <span>of {money(task.budget_cents)}</span>
-                        </div>
+                        {task.result ? <p className={styles.result}>{task.result}</p> : null}
                       </div>
-                      {task.result ? <p className={styles.result}>{task.result}</p> : null}
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}
@@ -298,6 +306,7 @@ export default function DashboardPage() {
                 <p className={styles.label}>RECENT ACTIVITY</p>
                 <h2>Policy decisions & settlements</h2>
               </div>
+              <Link className={styles.secondaryAction} href="/activity">Full audit</Link>
             </div>
 
             {data.recentPayments.length === 0 ? (
