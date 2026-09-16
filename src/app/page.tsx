@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 type Decision = {
   approved: boolean;
@@ -8,15 +9,27 @@ type Decision = {
   reason: string;
   remainingTaskBudgetCents: number;
   remainingDailyBudgetCents: number;
+  paymentRequestId: string;
 };
 
-const defaultPolicy = {
-  taskBudgetCents: 30,
-  dailyBudgetCents: 500,
-  maxTransactionCents: 15,
-  allowedCategories: ["search", "data", "compute", "inference"],
-  blockedProviders: ["blocked.example"],
+type Agent = {
+  id: string;
+  name: string;
+  status: string;
+  description: string | null;
 };
+
+type Policy = {
+  id: string;
+  agent_id: string;
+  task_budget_cents: number;
+  daily_budget_cents: number;
+  max_transaction_cents: number;
+  allowed_categories: string[];
+  blocked_providers: string[];
+};
+
+const taskPrompt = "Compare AI inference providers and recommend the best value.";
 
 const examples = [
   {
@@ -43,48 +56,137 @@ const examples = [
 ] as const;
 
 export default function Home() {
+  const [supabase] = useState(() => createClient());
+  const [agent, setAgent] = useState<Agent | null>(null);
+  const [policy, setPolicy] = useState<Policy | null>(null);
   const [spent, setSpent] = useState(0);
   const [events, setEvents] = useState<
     Array<(typeof examples)[number] & { decision: Decision }>
   >([]);
   const [running, setRunning] = useState(false);
+  const [initializing, setInitializing] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initialize() {
+      try {
+        setError(null);
+
+        const { data: claimsData } = await supabase.auth.getClaims();
+
+        if (!claimsData?.claims) {
+          const { error: anonymousError } = await supabase.auth.signInAnonymously();
+          if (anonymousError) throw anonymousError;
+        }
+
+        const response = await fetch("/api/bootstrap", { method: "POST" });
+        const payload = (await response.json()) as {
+          agent?: Agent;
+          policy?: Policy;
+          error?: string;
+        };
+
+        if (!response.ok || !payload.agent || !payload.policy) {
+          throw new Error(payload.error ?? "Could not initialize PolicyRail.");
+        }
+
+        if (!cancelled) {
+          setAgent(payload.agent);
+          setPolicy(payload.policy);
+        }
+      } catch (setupError) {
+        if (!cancelled) {
+          setError(
+            setupError instanceof Error
+              ? setupError.message
+              : "Could not initialize PolicyRail."
+          );
+        }
+      } finally {
+        if (!cancelled) setInitializing(false);
+      }
+    }
+
+    initialize();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   async function runDemo() {
+    if (!agent || !policy) return;
+
     setEvents([]);
     setSpent(0);
+    setError(null);
     setRunning(true);
 
-    let localSpent = 0;
-
-    for (const resource of examples) {
-      const response = await fetch("/api/policy/evaluate", {
+    try {
+      const taskResponse = await fetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          policy: defaultPolicy,
-          request: {
+        body: JSON.stringify({ agentId: agent.id, prompt: taskPrompt }),
+      });
+
+      const taskPayload = (await taskResponse.json()) as {
+        task?: { id: string };
+        error?: string;
+      };
+
+      if (!taskResponse.ok || !taskPayload.task) {
+        throw new Error(taskPayload.error ?? "Could not create task.");
+      }
+
+      let localSpent = 0;
+
+      for (const resource of examples) {
+        const response = await fetch("/api/policy/evaluate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            taskId: taskPayload.task.id,
             provider: resource.provider,
             resource: resource.resource,
             category: resource.category,
             amountCents: resource.amountCents,
-            taskSpentCents: localSpent,
-            dailySpentCents: localSpent,
-          },
-        }),
-      });
+          }),
+        });
 
-      const decision = (await response.json()) as Decision;
-      setEvents((current) => [...current, { ...resource, decision }]);
+        const decision = (await response.json()) as Decision & { error?: string };
 
-      if (decision.approved) {
-        localSpent += resource.amountCents;
-        setSpent(localSpent);
+        if (!response.ok) {
+          throw new Error(decision.error ?? "Policy evaluation failed.");
+        }
+
+        setEvents((current) => [...current, { ...resource, decision }]);
+
+        if (decision.approved) {
+          localSpent += resource.amountCents;
+          setSpent(localSpent);
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 550));
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 550));
+      await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: taskPayload.task.id,
+          result:
+            "ValueBench provides the best value for this task while remaining within PolicyRail spending constraints.",
+        }),
+      });
+    } catch (runError) {
+      setError(
+        runError instanceof Error ? runError.message : "The demo task failed."
+      );
+    } finally {
+      setRunning(false);
     }
-
-    setRunning(false);
   }
 
   return (
@@ -115,19 +217,25 @@ export default function Home() {
           <div className="panelHeader">
             <div>
               <p className="label">DEMO AGENT</p>
-              <h2>ResearchBot</h2>
+              <h2>{agent?.name ?? "ResearchBot"}</h2>
             </div>
-            <div className="status">ACTIVE</div>
+            <div className="status">
+              {initializing ? "CONNECTING" : agent ? "ACTIVE" : "OFFLINE"}
+            </div>
           </div>
 
           <div className="metrics">
             <div>
               <span>Task budget</span>
-              <strong>$0.30</strong>
+              <strong>
+                ${((policy?.task_budget_cents ?? 30) / 100).toFixed(2)}
+              </strong>
             </div>
             <div>
               <span>Max transaction</span>
-              <strong>$0.15</strong>
+              <strong>
+                ${((policy?.max_transaction_cents ?? 15) / 100).toFixed(2)}
+              </strong>
             </div>
             <div>
               <span>Spent</span>
@@ -137,11 +245,20 @@ export default function Home() {
 
           <div className="task">
             <span>Task</span>
-            <p>Compare AI inference providers and recommend the best value.</p>
+            <p>{taskPrompt}</p>
           </div>
 
-          <button onClick={runDemo} disabled={running}>
-            {running ? "Agent running…" : "Run policy demo"}
+          {error ? <p className="errorMessage">{error}</p> : null}
+
+          <button
+            onClick={runDemo}
+            disabled={running || initializing || !agent || !policy}
+          >
+            {initializing
+              ? "Connecting to policy store…"
+              : running
+                ? "Agent running…"
+                : "Run policy demo"}
           </button>
         </div>
 
@@ -155,7 +272,9 @@ export default function Home() {
 
           {events.length === 0 ? (
             <div className="empty">
-              Run the demo to watch PolicyRail evaluate autonomous purchases.
+              {initializing
+                ? "Connecting to the PolicyRail data layer…"
+                : "Run the demo to watch PolicyRail evaluate and persist autonomous purchases."}
             </div>
           ) : (
             <div className="events">
