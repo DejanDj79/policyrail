@@ -1,7 +1,7 @@
+import { fetchBazaarCatalog } from "@/lib/resources/bazaar-client";
 import {
   SOLANA_DEVNET_NETWORK,
   SOLANA_DEVNET_USDC_MINT,
-  X402_FACILITATOR_URL,
 } from "@/lib/x402/config";
 
 const SAMPLE_LIMIT = 100;
@@ -21,10 +21,6 @@ type BazaarItem = {
   extensions?: unknown;
 };
 
-type BazaarResponse = {
-  items?: unknown;
-};
-
 export interface BazaarPreviewResource {
   resource: string;
   provider: string;
@@ -34,7 +30,7 @@ export interface BazaarPreviewResource {
 }
 
 export interface BazaarPreviewResult {
-  source: "x402 Bazaar";
+  source: string;
   facilitator: string;
   checkedAt: string;
   sampleLimit: number;
@@ -114,23 +110,8 @@ function methodFor(item: BazaarItem) {
 }
 
 export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
-  const facilitator =
-    process.env.POLICYRAIL_BAZAAR_URL ?? X402_FACILITATOR_URL;
-  const endpoint = new URL(`${facilitator.replace(/\/$/, "")}/discovery/resources`);
-  endpoint.searchParams.set("type", "http");
-  endpoint.searchParams.set("limit", String(SAMPLE_LIMIT));
-
-  const response = await fetch(endpoint, {
-    cache: "no-store",
-    signal: AbortSignal.timeout(6_000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`x402 Bazaar preview failed with HTTP ${response.status}`);
-  }
-
-  const payload = (await response.json()) as BazaarResponse;
-  const items = Array.isArray(payload.items) ? payload.items : [];
+  const catalog = await fetchBazaarCatalog(SAMPLE_LIMIT);
+  const items = catalog.items;
 
   let http = 0;
   let exactDevnetUsdc = 0;
@@ -211,8 +192,8 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
   }
 
   return {
-    source: "x402 Bazaar",
-    facilitator,
+    source: catalog.source,
+    facilitator: catalog.baseUrl,
     checkedAt: new Date().toISOString(),
     sampleLimit: SAMPLE_LIMIT,
     filters: {
