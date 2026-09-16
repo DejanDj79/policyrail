@@ -183,7 +183,9 @@ export default function Home() {
           <span className="mark">P</span>
           PolicyRail
         </div>
-        <span className="badge">Crypto World&apos;s Fair 2026</span>
+        <a className="badge dashboardPolicyLink" href="/policy">
+          Agent policy →
+        </a>
       </nav>
 
       <section className="hero">
