@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -179,13 +180,15 @@ export default function Home() {
   return (
     <main className="shell">
       <nav>
-        <div className="brand">
+        <Link className="brand brandLink" href="/dashboard">
           <span className="mark">P</span>
           PolicyRail
+        </Link>
+        <div className="navLinks">
+          <Link href="/dashboard">Dashboard</Link>
+          <Link className="navActive" href="/">Agent run</Link>
+          <Link href="/policy">Agent policy</Link>
         </div>
-        <a className="badge dashboardPolicyLink" href="/policy">
-          Agent policy →
-        </a>
       </nav>
 
       <section className="hero">
