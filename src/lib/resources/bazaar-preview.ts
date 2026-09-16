@@ -36,6 +36,7 @@ export interface BazaarPreviewResource {
 
 export interface BazaarMainnetPreviewResource {
   resource: string;
+  requestUrl: string;
   provider: string;
   method: "GET";
   priceUsdc: string;
@@ -155,10 +156,34 @@ function descriptionFor(item: BazaarItem, url: URL) {
   );
 }
 
-function methodFor(item: BazaarItem) {
+function inputFor(item: BazaarItem) {
   const info = nestedRecord(item.extensions, "bazaar", "info");
-  const input = info && isRecord(info.input) ? info.input : null;
-  return stringValue(input?.method)?.toUpperCase() ?? "GET";
+  return info && isRecord(info.input) ? info.input : null;
+}
+
+function methodFor(item: BazaarItem) {
+  return stringValue(inputFor(item)?.method)?.toUpperCase() ?? "GET";
+}
+
+function requestUrlFor(resourceUrl: string, item: BazaarItem) {
+  const input = inputFor(item);
+  if (!input || !isRecord(input.queryParams)) return resourceUrl;
+
+  try {
+    const url = new URL(resourceUrl);
+    for (const [key, value] of Object.entries(input.queryParams)) {
+      if (
+        typeof value === "string" ||
+        typeof value === "number" ||
+        typeof value === "boolean"
+      ) {
+        url.searchParams.set(key, String(value));
+      }
+    }
+    return url.toString();
+  } catch {
+    return resourceUrl;
+  }
 }
 
 function increment(map: Map<string, number>, value: unknown) {
@@ -257,16 +282,15 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
         if (ledgerCompatible) mainnetWholeCentResources += 1;
         else mainnetFractionalCentResources += 1;
 
-        if (mainnetResources.length < MAINNET_RESOURCE_LIMIT) {
-          mainnetResources.push({
-            resource,
-            provider: url.hostname,
-            method: "GET",
-            priceUsdc: formatAtomicUsdc(mainnetRequirement.amount),
-            ledgerCompatible,
-            description: descriptionFor(item, url),
-          });
-        }
+        mainnetResources.push({
+          resource,
+          requestUrl: requestUrlFor(resource, item),
+          provider: url.hostname,
+          method: "GET",
+          priceUsdc: formatAtomicUsdc(mainnetRequirement.amount),
+          ledgerCompatible,
+          description: descriptionFor(item, url),
+        });
       }
     }
 
@@ -305,6 +329,10 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
     });
   }
 
+  const sortedMainnetResources = [...mainnetResources].sort(
+    (a, b) => Number(b.ledgerCompatible) - Number(a.ledgerCompatible)
+  );
+
   return {
     source: catalog.source,
     facilitator: catalog.baseUrl,
@@ -340,7 +368,7 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
       getResources: mainnetGetResources,
       wholeCentResources: mainnetWholeCentResources,
       fractionalCentResources: mainnetFractionalCentResources,
-      resources: mainnetResources,
+      resources: sortedMainnetResources.slice(0, MAINNET_RESOURCE_LIMIT),
     },
     resources: compatible.slice(0, 12),
   };
