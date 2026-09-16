@@ -1,0 +1,112 @@
+.card {
+  margin-top: 18px;
+  border: 1px solid rgba(134, 247, 200, 0.24);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(134, 247, 200, 0.05), rgba(134, 247, 200, 0.02)),
+    var(--panel-soft);
+  padding: 20px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.header h3 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.completeBadge {
+  flex: 0 0 auto;
+  border: 1px solid rgba(134, 247, 200, 0.24);
+  border-radius: 999px;
+  background: rgba(134, 247, 200, 0.08);
+  color: var(--accent);
+  padding: 6px 9px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.lead {
+  max-width: 900px;
+  margin: 16px 0 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.details {
+  margin-top: 18px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border);
+}
+
+.detailsLabel {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.details ul {
+  display: grid;
+  gap: 9px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.details li {
+  position: relative;
+  padding: 10px 12px 10px 30px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.018);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.details li::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 16px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(134, 247, 200, 0.06);
+}
+
+@media (max-width: 700px) {
+  .card {
+    padding: 16px;
+  }
+
+  .header {
+    gap: 12px;
+  }
+
+  .lead {
+    font-size: 15px;
+  }
+}
