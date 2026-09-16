@@ -13,6 +13,7 @@ type PreviewResource = {
 
 type MainnetPreviewResource = {
   resource: string;
+  requestUrl: string;
   provider: string;
   method: "GET";
   priceUsdc: string;
@@ -23,6 +24,37 @@ type MainnetPreviewResource = {
 type DistributionEntry = {
   value: string;
   count: number;
+};
+
+type ProbeOutcome =
+  | "valid-x402-402"
+  | "402-invalid-or-missing-challenge"
+  | "unprotected-success"
+  | "unexpected-http-status"
+  | "request-failed";
+
+type ProbeResult = {
+  resource: string;
+  requestUrl: string;
+  provider: string;
+  priceUsdc: string;
+  status: number | null;
+  outcome: ProbeOutcome;
+  hasPaymentRequiredHeader: boolean;
+  x402Version: number | null;
+  challengeAcceptsMainnetUsdc: boolean;
+  acceptsCount: number;
+  detail: string;
+};
+
+type ProbePayload = {
+  readOnly?: boolean;
+  paymentSignatureSent?: boolean;
+  checkedAt?: string;
+  candidates?: number;
+  validChallenges?: number;
+  results?: ProbeResult[];
+  error?: string;
 };
 
 type PreviewPayload = {
@@ -72,6 +104,21 @@ function compactIdentifier(value: string) {
   return `${value.slice(0, 16)}…${value.slice(-12)}`;
 }
 
+function probeLabel(outcome: ProbeOutcome) {
+  switch (outcome) {
+    case "valid-x402-402":
+      return "VALID x402 402";
+    case "402-invalid-or-missing-challenge":
+      return "402 / CHALLENGE MISMATCH";
+    case "unprotected-success":
+      return "NO PAYMENT REQUIRED";
+    case "unexpected-http-status":
+      return "UNEXPECTED STATUS";
+    case "request-failed":
+      return "REQUEST FAILED";
+  }
+}
+
 function DistributionList({
   title,
   entries,
@@ -102,6 +149,9 @@ export default function BazaarPreview() {
   const [preview, setPreview] = useState<PreviewPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [probe, setProbe] = useState<ProbePayload | null>(null);
+  const [probeError, setProbeError] = useState<string | null>(null);
+  const [probeLoading, setProbeLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,6 +187,32 @@ export default function BazaarPreview() {
       cancelled = true;
     };
   }, []);
+
+  async function runDryRunProbe() {
+    setProbeLoading(true);
+    setProbeError(null);
+
+    try {
+      const response = await fetch("/api/resources/bazaar-probe", {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as ProbePayload;
+
+      if (!response.ok || !payload.results) {
+        throw new Error(payload.error ?? "Could not run the Bazaar dry-run probe.");
+      }
+
+      setProbe(payload);
+    } catch (probeFailure) {
+      setProbeError(
+        probeFailure instanceof Error
+          ? probeFailure.message
+          : "Could not run the Bazaar dry-run probe."
+      );
+    } finally {
+      setProbeLoading(false);
+    }
+  }
 
   return (
     <section className={styles.preview}>
@@ -252,6 +328,75 @@ export default function BazaarPreview() {
                   <strong>{preview.solanaMainnet.fractionalCentResources}</strong>
                 </div>
               </div>
+
+              <div className={styles.probePanel}>
+                <div>
+                  <span>LIVE x402 HANDSHAKE CHECK</span>
+                  <strong>Probe the cent-ledger candidates without paying.</strong>
+                  <p>
+                    Sends plain GET requests only. No PAYMENT-SIGNATURE header, wallet signing or settlement is performed.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={styles.probeButton}
+                  onClick={runDryRunProbe}
+                  disabled={probeLoading || preview.solanaMainnet.wholeCentResources === 0}
+                >
+                  {probeLoading ? "Running probes…" : "Run dry-run probes"}
+                </button>
+              </div>
+
+              {probeError ? <div className={styles.probeError}>{probeError}</div> : null}
+
+              {probe?.results ? (
+                <section className={styles.probeResults}>
+                  <div className={styles.probeSummary}>
+                    <div>
+                      <span>Probed</span>
+                      <strong>{probe.candidates ?? probe.results.length}</strong>
+                    </div>
+                    <div>
+                      <span>Valid x402 challenges</span>
+                      <strong>{probe.validChallenges ?? 0}</strong>
+                    </div>
+                    <div>
+                      <span>Payment signatures sent</span>
+                      <strong>{probe.paymentSignatureSent ? "YES" : "NO"}</strong>
+                    </div>
+                  </div>
+
+                  <div className={styles.probeList}>
+                    {probe.results.map((result) => (
+                      <article key={`probe-${result.provider}-${result.requestUrl}`}>
+                        <div className={styles.probeTop}>
+                          <div>
+                            <span>{result.provider}</span>
+                            <strong>{result.priceUsdc} USDC</strong>
+                          </div>
+                          <span
+                            className={
+                              result.outcome === "valid-x402-402"
+                                ? styles.probeValid
+                                : styles.probeWarning
+                            }
+                          >
+                            {probeLabel(result.outcome)}
+                          </span>
+                        </div>
+                        <p>{result.detail}</p>
+                        <div className={styles.probeMeta}>
+                          <span>HTTP {result.status ?? "—"}</span>
+                          <span>v{result.x402Version ?? "—"}</span>
+                          <span>{result.acceptsCount} accepts</span>
+                          <span>{result.hasPaymentRequiredHeader ? "PAYMENT-REQUIRED ✓" : "PAYMENT-REQUIRED —"}</span>
+                        </div>
+                        <code title={result.requestUrl}>{result.requestUrl}</code>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
               {preview.solanaMainnet.resources.length > 0 ? (
                 <div className={styles.mainnetResources}>
