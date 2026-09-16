@@ -71,6 +71,13 @@ function payloadNumber(payload: Record<string, unknown> | null, key: string) {
   return typeof value === "number" ? value : null;
 }
 
+function payloadStringArray(payload: Record<string, unknown> | null, key: string) {
+  const value = payload?.[key];
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
+    ? value as string[]
+    : [];
+}
+
 function shortSignature(signature: string) {
   return `${signature.slice(0, 10)}…${signature.slice(-8)}`;
 }
@@ -80,6 +87,8 @@ function eventTitle(event: AuditEvent) {
   switch (event.event_type) {
     case "task_created":
       return "Task created";
+    case "resource_discovery_completed":
+      return "Resource discovery completed";
     case "agent_resource_proposed":
       return `AI proposed ${payloadText(payload, "resource_name") ?? "a paid resource"}`;
     case "payment_approved":
@@ -102,6 +111,15 @@ function eventBody(event: AuditEvent) {
   if (event.event_type === "task_created") {
     const budget = payloadNumber(payload, "budget_cents");
     return budget === null ? "The autonomous task entered the policy-controlled execution flow." : `Task budget set to ${money(budget)}.`;
+  }
+  if (event.event_type === "resource_discovery_completed") {
+    const resources = payloadStringArray(payload, "resource_ids");
+    const rationale = payloadText(payload, "rationale");
+    const confidence = payloadText(payload, "confidence");
+    if (resources.length === 0) {
+      return rationale ?? "No relevant paid resources were found in the current directory.";
+    }
+    return `${rationale ?? "Relevant directory resources were selected."} Matched: ${resources.join(", ")}${confidence ? ` · ${confidence} confidence` : ""}.`;
   }
   if (event.event_type === "agent_resource_proposed") {
     return payloadText(payload, "rationale") ?? "The AI selected this resource as its next procurement step.";
@@ -196,6 +214,7 @@ export default function ActivityDetailPage() {
         <div className={styles.navLinks}>
           <Link href="/dashboard">Dashboard</Link>
           <Link href="/tasks/new">New task</Link>
+          <Link href="/resources">Resources</Link>
           <Link className={styles.active} href="/activity">Activity</Link>
           <Link href="/policy">Agent policy</Link>
         </div>
@@ -247,7 +266,7 @@ export default function ActivityDetailPage() {
               <div className={styles.panelHeader}>
                 <div>
                   <p className={styles.label}>EXECUTION TIMELINE</p>
-                  <h2>Intent → policy → settlement</h2>
+                  <h2>Discovery → intent → policy → settlement</h2>
                 </div>
               </div>
 
