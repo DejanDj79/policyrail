@@ -214,8 +214,8 @@ export default function NewTaskPage() {
           <p className={styles.eyebrow}>NEW AUTONOMOUS TASK</p>
           <h1>Tell the agent what to achieve.</h1>
           <p>
-            Set the objective and a task-specific budget. The agent first discovers relevant directory
-            resources, then PolicyRail enforces every payment before the wallet signs.
+            Set the objective and budget. Watch discovery, policy decisions and real x402 settlement
+            happen live in the execution rail.
           </p>
         </div>
       </section>
@@ -249,7 +249,7 @@ export default function NewTaskPage() {
 
           <textarea
             className={styles.prompt}
-            rows={7}
+            rows={5}
             maxLength={4000}
             value={prompt}
             disabled={loading || running}
@@ -264,16 +264,15 @@ export default function NewTaskPage() {
           <div className={styles.disclosure}>
             <strong>Current MVP scope</strong>
             <p>
-              The synthetic directory currently covers AI inference research and Barcelona hotel
-              research. Discovery selects only the domain-specific resources relevant to each task before
-              procurement begins.
+              Synthetic resources cover AI inference and Barcelona hotel research. Discovery selects
+              only domain-relevant resources before procurement.
             </p>
           </div>
 
           <div className={styles.budgetBlock}>
             <label>
               <span>Task budget</span>
-              <small>May be lower than the agent policy maximum, never higher.</small>
+              <small>May be lower than the policy maximum, never higher.</small>
               <div className={styles.moneyInput}>
                 <b>$</b>
                 <input
@@ -290,11 +289,11 @@ export default function NewTaskPage() {
 
             <div className={styles.guardrails}>
               <div>
-                <span>Policy task max</span>
+                <span>Task max</span>
                 <strong>{money(policy?.task_budget_cents ?? 0)}</strong>
               </div>
               <div>
-                <span>Max transaction</span>
+                <span>Max tx</span>
                 <strong>{money(policy?.max_transaction_cents ?? 0)}</strong>
               </div>
               <div>
@@ -316,29 +315,43 @@ export default function NewTaskPage() {
           </button>
         </div>
 
-        <aside className={styles.sidePanel}>
-          <p className={styles.label}>EXECUTION BOUNDARY</p>
-          <h2>Discovery before procurement.</h2>
-          <div className={styles.steps}>
-            <span>1 · Agent interprets objective</span>
-            <span>2 · Directory discovery finds relevant resources</span>
-            <span>3 · Agent proposes a paid resource</span>
-            <span>4 · PolicyRail authorizes or rejects</span>
-            <span>5 · Agent adapts when rejected</span>
-            <span>6 · x402 settles approved spend</span>
+        <aside className={styles.sideColumn}>
+          {taskId ? (
+            <LiveExecution taskId={taskId} running={running} compact />
+          ) : (
+            <section className={styles.executionPreview}>
+              <div className={styles.previewHeader}>
+                <div>
+                  <p className={styles.label}>LIVE EXECUTION</p>
+                  <h2>Ready to run</h2>
+                </div>
+                <span className={styles.readyBadge}>READY</span>
+              </div>
+              <p className={styles.previewCopy}>
+                The rail becomes a real-time audit as soon as the task starts.
+              </p>
+              <div className={styles.compactFlow}>
+                <span>Discover resources</span>
+                <span>Propose purchase</span>
+                <span>Policy decision</span>
+                <span>Adapt if blocked</span>
+                <span>x402 settlement</span>
+              </div>
+            </section>
+          )}
+
+          <div className={styles.sideLinks}>
+            <Link href="/resources">Resource directory</Link>
+            <Link href="/policy">Active policy</Link>
           </div>
-          <Link href="/resources">Browse resource directory →</Link>
-          <Link href="/policy">Review active policy →</Link>
         </aside>
       </section>
-
-      {taskId ? <LiveExecution taskId={taskId} running={running} /> : null}
 
       {discovery || attempts.length > 0 || finalAnswer ? (
         <section className={styles.results}>
           <div className={styles.resultsHeader}>
             <div>
-              <p className={styles.label}>TASK EXECUTION</p>
+              <p className={styles.label}>TASK RESULT</p>
               <h2>{finalAnswer ? "Completed" : "Agent decisions"}</h2>
             </div>
             <div className={styles.spendBadge}>{money(spent)} spent</div>
