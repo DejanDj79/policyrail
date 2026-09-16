@@ -13,6 +13,7 @@ type PreviewResource = {
 
 type PreviewPayload = {
   source?: string;
+  facilitator?: string;
   checkedAt?: string;
   sampleLimit?: number;
   counts?: {
@@ -91,7 +92,9 @@ export default function BazaarPreview() {
           </p>
         </div>
         {preview?.checkedAt ? (
-          <small>Checked {new Date(preview.checkedAt).toLocaleTimeString()}</small>
+          <small>
+            {preview.source ?? "x402 Bazaar"} · Checked {new Date(preview.checkedAt).toLocaleTimeString()}
+          </small>
         ) : null}
       </div>
 
