@@ -54,15 +54,9 @@ async function rpc<T>(method: string, params: unknown[]) {
   return payload.result;
 }
 
-function formatTokenAmount(rawAmount: bigint, decimals: number) {
-  const divisor = 10n ** BigInt(decimals);
-  const whole = rawAmount / divisor;
-  const fraction = (rawAmount % divisor)
-    .toString()
-    .padStart(decimals, "0")
-    .replace(/0+$/, "");
-
-  return fraction ? `${whole}.${fraction}` : whole.toString();
+function formatTokenAmount(rawAmount: number, decimals: number) {
+  const value = rawAmount / 10 ** decimals;
+  return value.toFixed(decimals).replace(/\.?0+$/, "");
 }
 
 export async function GET() {
@@ -106,13 +100,23 @@ export async function GET() {
       rpc<BalanceResult>("getBalance", [address, { commitment: "confirmed" }]),
     ]);
 
-    let totalRaw = 0n;
+    let totalRaw = 0;
     let decimals = 6;
 
     for (const entry of tokenAccounts.value) {
       const tokenAmount = entry.account.data.parsed?.info?.tokenAmount;
       if (!tokenAmount?.amount) continue;
-      totalRaw += BigInt(tokenAmount.amount);
+
+      const rawAmount = Number(tokenAmount.amount);
+      if (!Number.isSafeInteger(rawAmount)) {
+        throw new Error("USDC balance exceeds the safe integer range.");
+      }
+
+      totalRaw += rawAmount;
+      if (!Number.isSafeInteger(totalRaw)) {
+        throw new Error("USDC balance exceeds the safe integer range.");
+      }
+
       if (typeof tokenAmount.decimals === "number") decimals = tokenAmount.decimals;
     }
 
