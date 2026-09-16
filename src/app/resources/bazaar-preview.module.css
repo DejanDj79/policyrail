@@ -63,14 +63,16 @@
   background: #141b27;
 }
 
-.stats {
+.stats,
+.mainnetStats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin-top: 18px;
 }
 
-.stats > div {
+.stats > div,
+.mainnetStats > div {
   min-height: 72px;
   padding: 13px 14px;
   border: 1px solid #222c3e;
@@ -81,7 +83,8 @@
   justify-content: space-between;
 }
 
-.stats span {
+.stats span,
+.mainnetStats span {
   color: #788397;
   font-size: 10px;
   font-weight: 800;
@@ -89,7 +92,8 @@
   text-transform: uppercase;
 }
 
-.stats strong {
+.stats strong,
+.mainnetStats strong {
   font-size: 20px;
 }
 
@@ -109,7 +113,8 @@
   color: #717d91;
 }
 
-.breakdown {
+.breakdown,
+.mainnetPreview {
   margin-top: 14px;
   padding: 15px;
   border: 1px solid #202b3d;
@@ -117,19 +122,22 @@
   background: #0a1018;
 }
 
-.breakdownHeader {
+.breakdownHeader,
+.mainnetHeader {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
 }
 
-.breakdownHeader > div {
+.breakdownHeader > div,
+.mainnetHeader > div {
   display: grid;
   gap: 5px;
 }
 
-.breakdownHeader span {
+.breakdownHeader span,
+.mainnetKickerRow > span {
   color: #86f7c8;
   font-size: 10px;
   font-weight: 900;
@@ -209,6 +217,150 @@
   font-size: 10px;
 }
 
+.mainnetPreview {
+  border-color: #2b3a4d;
+  background: #0b121b;
+}
+
+.mainnetHeader {
+  align-items: flex-start;
+}
+
+.mainnetKickerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mainnetKickerRow > strong {
+  padding: 4px 7px;
+  border: 1px solid #38465a;
+  border-radius: 999px;
+  color: #aab5c5;
+  background: #141b27;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.mainnetHeader h3 {
+  margin: 1px 0 0;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.mainnetHeader p {
+  max-width: 720px;
+  margin: 2px 0 0;
+  color: #788498;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.mainnetHeader > code {
+  max-width: 280px;
+  overflow: hidden;
+  color: #7d899b;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mainnetStats {
+  margin-top: 13px;
+}
+
+.mainnetStats > div {
+  min-height: 66px;
+  background: #101823;
+}
+
+.mainnetResources {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.mainnetResources article {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #202c3e;
+  border-radius: 10px;
+  background: #101722;
+}
+
+.mainnetResourceTop,
+.mainnetResourceFooter {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.mainnetResourceTop > span {
+  min-width: 0;
+  overflow: hidden;
+  color: #86f7c8;
+  font-size: 10px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mainnetResourceTop > strong {
+  flex: 0 0 auto;
+  font-size: 10px;
+}
+
+.mainnetResources p {
+  margin: 8px 0;
+  color: #98a4b6;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.mainnetResourceFooter code {
+  min-width: 0;
+  overflow: hidden;
+  color: #6f7b8f;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledgerReady,
+.atomicNeeded {
+  flex: 0 0 auto;
+  padding: 4px 6px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+}
+
+.ledgerReady {
+  border: 1px solid #31594c;
+  color: #86f7c8;
+  background: #10241e;
+}
+
+.atomicNeeded {
+  border: 1px solid #4b3f2b;
+  color: #e2bd78;
+  background: #211a10;
+}
+
+.mainnetEmpty {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #202b3d;
+  border-radius: 10px;
+  color: #7e899b;
+  background: #101722;
+  font-size: 10px;
+}
+
 .state,
 .empty {
   margin-top: 16px;
@@ -269,7 +421,8 @@
 
 @media (max-width: 800px) {
   .header,
-  .breakdownHeader {
+  .breakdownHeader,
+  .mainnetHeader {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -279,7 +432,9 @@
   }
 
   .stats,
-  .resources {
+  .mainnetStats,
+  .resources,
+  .mainnetResources {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -290,7 +445,14 @@
 
 @media (max-width: 560px) {
   .stats,
-  .resources {
+  .mainnetStats,
+  .resources,
+  .mainnetResources {
     grid-template-columns: 1fr;
+  }
+
+  .mainnetResourceFooter {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
