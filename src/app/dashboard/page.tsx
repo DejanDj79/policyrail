@@ -155,6 +155,7 @@ export default function DashboardPage() {
         <div className={styles.navLinks}>
           <Link className={styles.active} href="/dashboard">Dashboard</Link>
           <Link href="/tasks/new">New task</Link>
+          <Link href="/resources">Resources</Link>
           <Link href="/activity">Activity</Link>
           <Link href="/policy">Agent policy</Link>
         </div>
@@ -169,7 +170,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className={styles.heroActions}>
-          <Link className={styles.secondaryAction} href="/policy">Edit policy</Link>
+          <Link className={styles.secondaryAction} href="/resources">Browse resources</Link>
           <Link className={styles.primaryAction} href="/tasks/new">New task</Link>
         </div>
       </section>
