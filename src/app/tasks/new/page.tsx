@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import AgentResult from "./AgentResult";
 import LiveExecution from "./LiveExecution";
 import styles from "./new-task.module.css";
 
@@ -391,12 +392,7 @@ export default function NewTaskPage() {
             ))}
           </div>
 
-          {finalAnswer ? (
-            <div className={styles.finalAnswer}>
-              <span>Agent result</span>
-              <p>{finalAnswer}</p>
-            </div>
-          ) : null}
+          {finalAnswer ? <AgentResult answer={finalAnswer} /> : null}
 
           <div className={styles.resultActions}>
             <Link href="/dashboard">Back to dashboard</Link>
