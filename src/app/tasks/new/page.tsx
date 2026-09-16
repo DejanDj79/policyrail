@@ -47,7 +47,10 @@ type RunPayload = {
   error?: string;
 };
 
-const DEMO_TASK = "Compare AI inference providers and recommend the best overall value, considering cost efficiency, reliability and latency.";
+const INFERENCE_DEMO_TASK =
+  "Compare AI inference providers and recommend the best overall value, considering cost efficiency, reliability and latency.";
+const TRAVEL_DEMO_TASK =
+  "Find the best hotel in Barcelona for a 3-day weekend and compare price, location and guest rating.";
 
 function money(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
@@ -223,14 +226,24 @@ export default function NewTaskPage() {
               <p className={styles.label}>TASK OBJECTIVE</p>
               <h2>What should {agent?.name ?? "the agent"} do?</h2>
             </div>
-            <button
-              className={styles.preset}
-              type="button"
-              disabled={loading || running}
-              onClick={() => setPrompt(DEMO_TASK)}
-            >
-              Use demo task
-            </button>
+            <div className={styles.presetGroup}>
+              <button
+                className={styles.preset}
+                type="button"
+                disabled={loading || running}
+                onClick={() => setPrompt(INFERENCE_DEMO_TASK)}
+              >
+                Inference demo
+              </button>
+              <button
+                className={styles.preset}
+                type="button"
+                disabled={loading || running}
+                onClick={() => setPrompt(TRAVEL_DEMO_TASK)}
+              >
+                Travel demo
+              </button>
+            </div>
           </div>
 
           <textarea
@@ -239,7 +252,7 @@ export default function NewTaskPage() {
             maxLength={4000}
             value={prompt}
             disabled={loading || running}
-            placeholder="Example: Compare AI inference providers and recommend the best overall value..."
+            placeholder="Example: Compare providers, research a hotel stay, or enter another task supported by the directory..."
             onChange={(event) => setPrompt(event.target.value)}
           />
           <div className={styles.promptMeta}>
@@ -250,9 +263,9 @@ export default function NewTaskPage() {
           <div className={styles.disclosure}>
             <strong>Current MVP scope</strong>
             <p>
-              The agent now filters the resource directory for each task before procurement. The current
-              synthetic directory is still centered on AI inference-provider research; expanding the
-              catalog to more domains is the next step.
+              The synthetic directory currently covers AI inference research and Barcelona hotel
+              research. Discovery selects only the domain-specific resources relevant to each task before
+              procurement begins.
             </p>
           </div>
 
