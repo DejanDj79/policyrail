@@ -108,6 +108,7 @@ export default function ActivityPage() {
         <div className={styles.navLinks}>
           <Link href="/dashboard">Dashboard</Link>
           <Link href="/tasks/new">New task</Link>
+          <Link href="/resources">Resources</Link>
           <Link className={styles.active} href="/activity">Activity</Link>
           <Link href="/policy">Agent policy</Link>
         </div>
@@ -118,8 +119,8 @@ export default function ActivityPage() {
           <p className={styles.eyebrow}>AUDIT & EXECUTION HISTORY</p>
           <h1>Every task. Every decision. Every payment.</h1>
           <p>
-            Open any autonomous run to inspect what the agent proposed, what policy allowed or blocked,
-            and what actually settled on Solana.
+            Open any autonomous run to inspect what the agent discovered, proposed, what policy allowed
+            or blocked, and what actually settled on Solana.
           </p>
         </div>
         <Link className={styles.primaryAction} href="/tasks/new">New task</Link>
