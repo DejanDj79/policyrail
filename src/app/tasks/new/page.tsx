@@ -339,11 +339,6 @@ export default function NewTaskPage() {
               </div>
             </section>
           )}
-
-          <div className={styles.sideLinks}>
-            <Link href="/resources">Resource directory</Link>
-            <Link href="/policy">Active policy</Link>
-          </div>
         </aside>
       </section>
 
