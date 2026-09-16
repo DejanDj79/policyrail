@@ -301,6 +301,29 @@ button:disabled {
   color: var(--accent);
 }
 
+.settlementDetail {
+  border-color: rgba(134, 247, 200, 0.22);
+  background: rgba(134, 247, 200, 0.035);
+}
+
+.settlementDetail span {
+  color: var(--accent);
+}
+
+.settlementDetail a {
+  display: inline-block;
+  margin-top: 7px;
+  color: var(--accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.settlementDetail a:hover {
+  text-decoration: underline;
+}
+
 .flow {
   display: flex;
   justify-content: center;
