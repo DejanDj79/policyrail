@@ -86,6 +86,8 @@
   border-radius: 14px;
   background: var(--panel-soft);
   padding: 14px 16px 14px 14px;
+  animation: eventEnter 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: top center;
 }
 
 .eventMarker {
@@ -95,6 +97,7 @@
   border-radius: 999px;
   background: #7f899b;
   box-shadow: 0 0 0 4px rgba(127, 137, 155, 0.08);
+  animation: markerPulse 700ms ease-out both;
 }
 
 .eventContent {
@@ -285,6 +288,50 @@
   margin-top: 10px;
   padding: 9px 10px;
   font-size: 10px;
+}
+
+@keyframes eventEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+    filter: brightness(1.18);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(-1px) scale(1.002);
+    filter: brightness(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes markerPulse {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.35;
+  }
+  45% {
+    transform: scale(1.45);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .event,
+  .eventMarker {
+    animation: none;
+  }
+
+  .compact .timeline {
+    scroll-behavior: auto;
+  }
 }
 
 @media (max-width: 900px) {
