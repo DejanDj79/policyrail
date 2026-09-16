@@ -1,0 +1,85 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+const DEFAULT_POLICY = {
+  task_budget_cents: 30,
+  daily_budget_cents: 500,
+  max_transaction_cents: 15,
+  allowed_categories: ["search", "data", "compute", "inference"],
+  blocked_providers: ["blocked.example"],
+};
+
+export async function POST() {
+  const supabase = await createClient();
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
+
+  if (claimsError || !userId) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
+  const { data: existingAgent, error: agentReadError } = await supabase
+    .from("agents")
+    .select("id,name,status,description")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (agentReadError) {
+    return NextResponse.json({ error: agentReadError.message }, { status: 500 });
+  }
+
+  let agent = existingAgent;
+
+  if (!agent) {
+    const { data: createdAgent, error: createAgentError } = await supabase
+      .from("agents")
+      .insert({
+        user_id: userId,
+        name: "ResearchBot",
+        description: "Demo research agent for PolicyRail autonomous spending workflows.",
+        status: "active",
+      })
+      .select("id,name,status,description")
+      .single();
+
+    if (createAgentError) {
+      return NextResponse.json({ error: createAgentError.message }, { status: 500 });
+    }
+
+    agent = createdAgent;
+  }
+
+  const { data: existingPolicy, error: policyReadError } = await supabase
+    .from("policies")
+    .select(
+      "id,agent_id,task_budget_cents,daily_budget_cents,max_transaction_cents,allowed_categories,blocked_providers"
+    )
+    .eq("agent_id", agent.id)
+    .maybeSingle();
+
+  if (policyReadError) {
+    return NextResponse.json({ error: policyReadError.message }, { status: 500 });
+  }
+
+  let policy = existingPolicy;
+
+  if (!policy) {
+    const { data: createdPolicy, error: createPolicyError } = await supabase
+      .from("policies")
+      .insert({ agent_id: agent.id, ...DEFAULT_POLICY })
+      .select(
+        "id,agent_id,task_budget_cents,daily_budget_cents,max_transaction_cents,allowed_categories,blocked_providers"
+      )
+      .single();
+
+    if (createPolicyError) {
+      return NextResponse.json({ error: createPolicyError.message }, { status: 500 });
+    }
+
+    policy = createdPolicy;
+  }
+
+  return NextResponse.json({ agent, policy });
+}
