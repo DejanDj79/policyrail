@@ -5,6 +5,10 @@ import {
 
 export type ResourceRegistryKind = "local-demo" | "external";
 
+export interface RegistryResource extends PaidResource {
+  purchaseUrl?: string;
+}
+
 export interface ResourceRegistryInfo {
   id: string;
   name: string;
@@ -15,8 +19,8 @@ export interface ResourceRegistryInfo {
 
 export interface ResourceRegistry {
   readonly info: ResourceRegistryInfo;
-  listResources(): Promise<PaidResource[]>;
-  getResourceById(id: string): Promise<PaidResource | undefined>;
+  listResources(): Promise<RegistryResource[]>;
+  getResourceById(id: string): Promise<RegistryResource | undefined>;
 }
 
 class LocalDemoResourceRegistry implements ResourceRegistry {
@@ -43,7 +47,7 @@ export function getResourceRegistry(): ResourceRegistry {
   return localDemoRegistry;
 }
 
-export function toPublicResourceMetadata(resource: PaidResource) {
+export function toPublicResourceMetadata(resource: RegistryResource) {
   return {
     id: resource.id,
     name: resource.name,
@@ -59,5 +63,6 @@ export function toPublicResourceMetadata(resource: PaidResource) {
     paymentProtocol: "x402",
     settlementNetwork: "Solana Devnet",
     currency: "USDC",
+    purchaseTarget: resource.purchaseUrl ? "external" : "policyrail-proxy",
   };
 }
