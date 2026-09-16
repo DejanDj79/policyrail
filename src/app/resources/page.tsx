@@ -19,11 +19,21 @@ type Resource = {
   paymentProtocol: string;
   settlementNetwork: string;
   currency: string;
+  purchaseTarget: "external" | "policyrail-proxy";
+};
+
+type RegistryInfo = {
+  id: string;
+  name: string;
+  kind: "local-demo" | "external";
+  synthetic: boolean;
+  version: string;
 };
 
 type ResourcePayload = {
   catalog?: string;
   catalogVersion?: string;
+  registry?: RegistryInfo;
   resources?: Resource[];
   error?: string;
 };
@@ -36,6 +46,7 @@ function money(cents: number) {
 
 export default function ResourcesPage() {
   const [resources, setResources] = useState<Resource[]>([]);
+  const [registry, setRegistry] = useState<RegistryInfo | null>(null);
   const [query, setQuery] = useState("");
   const [domain, setDomain] = useState("all");
   const [category, setCategory] = useState("all");
@@ -56,7 +67,10 @@ export default function ResourcesPage() {
           throw new Error(payload.error ?? "Could not load the resource directory.");
         }
 
-        if (!cancelled) setResources(payload.resources);
+        if (!cancelled) {
+          setResources(payload.resources);
+          setRegistry(payload.registry ?? null);
+        }
       } catch (loadError) {
         if (!cancelled) {
           setError(
@@ -173,12 +187,15 @@ export default function ResourcesPage() {
 
       <section className={styles.disclosure}>
         <div>
-          <span className={styles.syntheticBadge}>SYNTHETIC MVP CATALOG</span>
-          <strong>Transparent demo resources, real payment flow.</strong>
+          <span className={styles.syntheticBadge}>
+            {registry?.kind === "external" ? "EXTERNAL REGISTRY" : "LOCAL DEMO REGISTRY"}
+          </span>
+          <strong>{registry?.name ?? "PolicyRail Resource Registry"}</strong>
         </div>
         <p>
-          Resource metadata and purchased content are synthetic for the hackathon demo. Discovery,
-          policy authorization, x402 payment handling, Solana Devnet settlement and audit records are real.
+          The directory is now served through the ResourceRegistry layer. Current entries remain synthetic
+          for a reliable hackathon demo; discovery, policy authorization, x402 payment handling, Solana
+          Devnet settlement and audit records are real.
         </p>
       </section>
 
@@ -261,7 +278,9 @@ export default function ResourcesPage() {
                   <span>Resource ID</span>
                   <code>{resource.id}</code>
                 </div>
-                <span className={styles.available}>x402 READY</span>
+                <span className={styles.available}>
+                  {resource.purchaseTarget === "external" ? "EXTERNAL x402" : "x402 READY"}
+                </span>
               </div>
             </article>
           ))}
@@ -271,11 +290,11 @@ export default function ResourcesPage() {
       <section className={styles.nextStep}>
         <div>
           <p className={styles.eyebrow}>TASK-AWARE DISCOVERY</p>
-          <h2>One directory. Different resources for different tasks.</h2>
+          <h2>One registry. Different resources for different tasks.</h2>
           <p>
-            Inference research now discovers only inference resources, while travel tasks discover hotel
-            inventory, review and location data. Procurement still happens only after discovery and every
-            payment remains subject to the active PolicyRail policy.
+            Inference research discovers only inference resources, while travel tasks discover hotel
+            inventory, review and location data. The same discovery and policy flow can now consume future
+            registry adapters without changing the procurement engine.
           </p>
         </div>
         <Link href="/tasks/new">Run a discovery task →</Link>
