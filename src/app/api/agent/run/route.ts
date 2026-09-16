@@ -100,7 +100,12 @@ export async function POST(request: Request) {
       );
 
       const canComplete = hasEnoughEvidence(evidence) || availableResources.length === 0;
-      const allowedActions = canComplete ? ["buy", "complete"] : ["buy"];
+      const allowedActions =
+        availableResources.length === 0
+          ? ["complete"]
+          : canComplete
+            ? ["buy", "complete"]
+            : ["buy"];
       const resourceIds = [
         ...availableResources.map((resource) => resource.id),
         "none",
@@ -118,6 +123,8 @@ export async function POST(request: Request) {
           "If a previous proposal was rejected, explicitly adapt to the rejection reason and prefer a viable alternative.",
           "For comparison tasks, gather complementary market/search evidence and benchmark/data evidence before completing when those resource types are available.",
           "Use only the resources in the supplied catalog. Do not invent providers or prices.",
+          "When completing, set resource_id to none and put the final task answer in final_answer.",
+          "When buying, choose a real resource_id and keep final_answer empty.",
           "Keep rationale concise and economically meaningful.",
         ].join(" "),
         input: JSON.stringify({
