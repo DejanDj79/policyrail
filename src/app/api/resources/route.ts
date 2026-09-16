@@ -7,6 +7,8 @@ export async function GET() {
     name: resource.name,
     provider: resource.provider,
     resource: resource.resource,
+    domain: resource.domain,
+    tags: resource.tags,
     category: resource.category,
     amountCents: resource.amountCents,
     qualityScore: resource.qualityScore,
@@ -19,7 +21,7 @@ export async function GET() {
 
   return NextResponse.json({
     catalog: "PolicyRail MVP Resource Directory",
-    catalogVersion: "synthetic-v1",
+    catalogVersion: "synthetic-v2",
     resources,
   });
 }
