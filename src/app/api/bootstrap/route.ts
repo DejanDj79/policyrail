@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getX402Configuration } from "@/lib/x402/config";
 
 const DEFAULT_POLICY = {
   task_budget_cents: 30,
@@ -18,9 +19,11 @@ export async function POST() {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
 
+  const configuredWalletAddress = getX402Configuration().agentAddress;
+
   const { data: existingAgent, error: agentReadError } = await supabase
     .from("agents")
-    .select("id,name,status,description")
+    .select("id,name,status,description,wallet_address")
     .eq("user_id", userId)
     .order("created_at", { ascending: true })
     .limit(1)
@@ -40,8 +43,9 @@ export async function POST() {
         name: "ResearchBot",
         description: "Demo research agent for PolicyRail autonomous spending workflows.",
         status: "active",
+        wallet_address: configuredWalletAddress,
       })
-      .select("id,name,status,description")
+      .select("id,name,status,description,wallet_address")
       .single();
 
     if (createAgentError) {
@@ -49,6 +53,23 @@ export async function POST() {
     }
 
     agent = createdAgent;
+  } else if (
+    configuredWalletAddress &&
+    agent.wallet_address !== configuredWalletAddress
+  ) {
+    const { data: updatedAgent, error: walletUpdateError } = await supabase
+      .from("agents")
+      .update({ wallet_address: configuredWalletAddress })
+      .eq("id", agent.id)
+      .eq("user_id", userId)
+      .select("id,name,status,description,wallet_address")
+      .single();
+
+    if (walletUpdateError) {
+      return NextResponse.json({ error: walletUpdateError.message }, { status: 500 });
+    }
+
+    agent = updatedAgent;
   }
 
   const { data: existingPolicy, error: policyReadError } = await supabase
