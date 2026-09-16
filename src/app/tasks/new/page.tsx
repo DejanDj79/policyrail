@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import LiveExecution from "./LiveExecution";
 import styles from "./new-task.module.css";
 
 type Agent = {
@@ -330,6 +331,8 @@ export default function NewTaskPage() {
           <Link href="/policy">Review active policy →</Link>
         </aside>
       </section>
+
+      {taskId ? <LiveExecution taskId={taskId} running={running} /> : null}
 
       {discovery || attempts.length > 0 || finalAnswer ? (
         <section className={styles.results}>
