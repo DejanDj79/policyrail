@@ -30,7 +30,7 @@ export async function authorizePaymentForTask(
 ) {
   const { data: task, error: taskError } = await supabase
     .from("tasks")
-    .select("id,agent_id,spent_cents,status")
+    .select("id,agent_id,budget_cents,spent_cents,status")
     .eq("id", request.taskId)
     .single();
 
@@ -73,7 +73,7 @@ export async function authorizePaymentForTask(
   );
 
   const policy: SpendingPolicy = {
-    taskBudgetCents: storedPolicy.task_budget_cents,
+    taskBudgetCents: Math.min(task.budget_cents, storedPolicy.task_budget_cents),
     dailyBudgetCents: storedPolicy.daily_budget_cents,
     maxTransactionCents: storedPolicy.max_transaction_cents,
     allowedCategories: storedPolicy.allowed_categories.filter((category: string) =>
@@ -125,6 +125,7 @@ export async function authorizePaymentForTask(
       decision_code: decision.code,
       reason: decision.reason,
       settlement_status: decision.approved ? "authorized" : "not_applicable",
+      effective_task_budget_cents: policy.taskBudgetCents,
     },
   });
 
