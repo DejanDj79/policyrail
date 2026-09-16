@@ -22,6 +22,46 @@ function dollarsFromCents(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
+function extractResourceContent(rawBody: string) {
+  const trimmed = rawBody.trim();
+  if (!trimmed) return null;
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "content" in parsed &&
+      typeof (parsed as { content?: unknown }).content === "string"
+    ) {
+      return (parsed as { content: string }).content;
+    }
+
+    return JSON.stringify(parsed);
+  } catch {
+    return trimmed;
+  }
+}
+
+function extractError(rawBody: string) {
+  try {
+    const parsed = JSON.parse(rawBody) as unknown;
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "error" in parsed &&
+      typeof (parsed as { error?: unknown }).error === "string"
+    ) {
+      return (parsed as { error: string }).error;
+    }
+  } catch {
+    // Fall back to the HTTP status message below.
+  }
+
+  return null;
+}
+
 export async function purchaseX402Resource(
   url: string,
   maxAmountCents: number
@@ -50,21 +90,16 @@ export async function purchaseX402Resource(
     method: "GET",
     cache: "no-store",
   });
-
-  let body: { content?: string; error?: string } = {};
-  try {
-    body = (await response.json()) as { content?: string; error?: string };
-  } catch {
-    // Preserve the HTTP error below when a remote endpoint returns a non-JSON body.
-  }
+  const rawBody = await response.text();
 
   if (!response.ok) {
     throw new Error(
-      body.error ?? `x402 resource request failed with HTTP ${response.status}`
+      extractError(rawBody) ?? `x402 resource request failed with HTTP ${response.status}`
     );
   }
 
-  if (!body.content) {
+  const content = extractResourceContent(rawBody);
+  if (!content) {
     throw new Error("x402 resource returned no content");
   }
 
@@ -81,7 +116,7 @@ export async function purchaseX402Resource(
   }
 
   return {
-    content: body.content,
+    content,
     transactionSignature: settlement.transaction,
     network: settlement.network,
     payer: settlement.payer ?? null,
