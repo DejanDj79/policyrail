@@ -44,6 +44,7 @@ export async function discoverResourcesForTask(
     instructions: [
       "You are the resource discovery layer for an autonomous procurement agent.",
       "Your only job is to identify which directory entries are relevant to the user's task.",
+      "Use domain and tags as strong relevance signals, then confirm relevance from the resource description.",
       "Discovery is not a spending decision. Do not exclude a relevant resource because it is expensive; PolicyRail and the procurement agent handle price and authorization later.",
       "Include every catalog resource that could materially improve the task result, but exclude unrelated resources.",
       "Use only supplied resource IDs and never invent providers or capabilities.",
@@ -56,6 +57,8 @@ export async function discoverResourcesForTask(
         id: resource.id,
         name: resource.name,
         provider: resource.provider,
+        domain: resource.domain,
+        tags: resource.tags,
         category: resource.category,
         price_cents: resource.amountCents,
         quality_score: resource.qualityScore,
