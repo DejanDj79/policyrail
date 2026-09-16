@@ -37,5 +37,9 @@ export function assertX402ClientConfigured() {
     );
   }
 
-  return config;
+  return {
+    ...config,
+    agentPrivateKey: config.agentPrivateKey,
+    merchantAddress: config.merchantAddress,
+  };
 }
