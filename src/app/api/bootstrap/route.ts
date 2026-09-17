@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { centsToAtomicUsdc } from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/server";
 import { getX402Configuration } from "@/lib/x402/config";
 
@@ -7,9 +6,6 @@ const DEFAULT_POLICY = {
   task_budget_cents: 30,
   daily_budget_cents: 500,
   max_transaction_cents: 15,
-  task_budget_atomic: centsToAtomicUsdc(30),
-  daily_budget_atomic: centsToAtomicUsdc(500),
-  max_transaction_atomic: centsToAtomicUsdc(15),
   allowed_categories: ["search", "data", "compute", "inference"],
   blocked_providers: ["blocked.example"],
 };
