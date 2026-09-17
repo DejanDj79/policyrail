@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import {
+  centsToAtomicUsdc,
+  formatAtomicUsdDisplay,
+} from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/client";
 import styles from "./activity.module.css";
 
@@ -12,7 +16,9 @@ type ActivityTask = {
   prompt: string;
   status: string;
   budget_cents: number;
+  budget_atomic: number | null;
   spent_cents: number;
+  spent_atomic: number | null;
   result: string | null;
   created_at: string;
   completed_at: string | null;
@@ -20,7 +26,7 @@ type ActivityTask = {
     approved: number;
     rejected: number;
     settled: number;
-    settledCents: number;
+    settledAtomic: number;
   };
 };
 
@@ -32,8 +38,15 @@ type ActivityPayload = {
 const filters = ["all", "completed", "running", "failed"] as const;
 type Filter = (typeof filters)[number];
 
-function money(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
+function atomicOrCents(
+  atomic: number | null | undefined,
+  cents: number | null | undefined
+) {
+  if (Number.isSafeInteger(atomic) && Number(atomic) >= 0) return Number(atomic);
+  if (Number.isSafeInteger(cents) && Number(cents) >= 0) {
+    return centsToAtomicUsdc(Number(cents));
+  }
+  return 0;
 }
 
 function dateLabel(value: string) {
@@ -163,9 +176,17 @@ export default function ActivityPage() {
               </div>
 
               <div className={styles.cardRight}>
-                <strong className={styles.money}>{money(task.spent_cents)}</strong>
+                <strong className={styles.money}>
+                  {formatAtomicUsdDisplay(
+                    atomicOrCents(task.spent_atomic, task.spent_cents)
+                  )}
+                </strong>
                 <div className={styles.meta}>
-                  <span>of {money(task.budget_cents)} budget</span>
+                  <span>
+                    of {formatAtomicUsdDisplay(
+                      atomicOrCents(task.budget_atomic, task.budget_cents)
+                    )} budget
+                  </span>
                 </div>
                 <div className={styles.cardStats}>
                   {task.activity.settled ? <span className={styles.settled}>{task.activity.settled} settled</span> : null}
