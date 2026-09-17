@@ -7,6 +7,7 @@ import {
   atomicUsdcToExactCents,
   centsToAtomicUsdc,
   formatAtomicUsd,
+  formatAtomicUsdDisplay,
   formatAtomicUsdc,
 } from "../src/lib/money/usdc.ts";
 
@@ -45,5 +46,9 @@ assert.equal(formatAtomicUsdc(1_000_000), "1");
 assert.equal(formatAtomicUsdc(1_234_567), "1.234567");
 assert.equal(formatAtomicUsd(1), "$0.000001");
 assert.equal(formatAtomicUsd(1_230_000), "$1.23");
+assert.equal(formatAtomicUsdDisplay(1), "$0.000001");
+assert.equal(formatAtomicUsdDisplay(10_000), "$0.01");
+assert.equal(formatAtomicUsdDisplay(300_000), "$0.30");
+assert.equal(formatAtomicUsdDisplay(1_230_000), "$1.23");
 
 console.log("USDC atomic money invariants passed.");
