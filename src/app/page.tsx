@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatAtomicUsdDisplay } from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/client";
+import {
+  solanaExplorerTransactionUrl,
+  solanaNetworkLabel,
+} from "@/lib/x402/network-display";
 
 type Agent = {
   id: string;
@@ -33,6 +37,8 @@ type AgentAttempt = {
   policyReason: string;
   decisionCode: string;
   settlementStatus: "not_applicable" | "simulated" | "settled";
+  settlementNetwork: string;
+  settlementAsset: string;
   transactionSignature: string | null;
 };
 
@@ -43,7 +49,8 @@ type AgentRunPayload = {
   totalSpentAtomic?: number;
   totalSpentUsdc?: string;
   totalSpentCents?: number | null;
-  settlementMode?: "simulated" | "x402-solana-devnet";
+  settlementMode?: string;
+  settlementNetworks?: string[];
   attempts?: AgentAttempt[];
   error?: string;
 };
@@ -55,6 +62,15 @@ function shortSignature(signature: string) {
   return `${signature.slice(0, 10)}…${signature.slice(-8)}`;
 }
 
+function settlementModeLabel(mode: string) {
+  if (mode === "simulated") return "simulated";
+  if (mode === "x402-solana-devnet") return "x402 / Solana Devnet";
+  if (mode === "x402-solana-mainnet") return "x402 / Solana Mainnet";
+  if (mode === "x402-solana-mixed") return "x402 / mixed Solana networks";
+  if (mode === "x402-enabled-no-settlement") return "x402 enabled / no settlement";
+  return mode;
+}
+
 export default function Home() {
   const [supabase] = useState(() => createClient());
   const [agent, setAgent] = useState<Agent | null>(null);
@@ -63,9 +79,7 @@ export default function Home() {
   const [events, setEvents] = useState<AgentAttempt[]>([]);
   const [finalAnswer, setFinalAnswer] = useState<string | null>(null);
   const [model, setModel] = useState<string | null>(null);
-  const [settlementMode, setSettlementMode] = useState<
-    "simulated" | "x402-solana-devnet" | null
-  >(null);
+  const [settlementMode, setSettlementMode] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -251,11 +265,7 @@ export default function Home() {
               {settlementMode ? (
                 <>
                   {" · "}
-                  Settlement: <strong>
-                    {settlementMode === "x402-solana-devnet"
-                      ? "x402 / Solana Devnet"
-                      : "simulated"}
-                  </strong>
+                  Settlement: <strong>{settlementModeLabel(settlementMode)}</strong>
                 </>
               ) : null}
             </p>
@@ -322,12 +332,15 @@ export default function Home() {
                       <span>Settlement</span>
                       <p>
                         {event.settlementStatus === "settled"
-                          ? "SETTLED · x402 exact · Solana Devnet"
+                          ? `SETTLED · x402 exact · ${solanaNetworkLabel(event.settlementNetwork)}`
                           : "SIMULATED · wallet signing disabled"}
                       </p>
                       {event.transactionSignature ? (
                         <a
-                          href={`https://explorer.solana.com/tx/${event.transactionSignature}?cluster=devnet`}
+                          href={solanaExplorerTransactionUrl(
+                            event.transactionSignature,
+                            event.settlementNetwork
+                          )}
                           target="_blank"
                           rel="noreferrer"
                         >
