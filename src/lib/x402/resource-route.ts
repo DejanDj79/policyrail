@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withX402 } from "@x402/next";
 import type { PaidResource } from "@/lib/agent/resources";
+import { formatAtomicUsdc } from "@/lib/money/usdc";
 import {
   getX402Configuration,
   isX402Enabled,
@@ -9,10 +10,6 @@ import {
 import { policyRailResourceServer } from "@/lib/x402/server";
 
 const SAFE_BUILD_ADDRESS = "11111111111111111111111111111111";
-
-function dollarsFromCents(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 export function createPaidResourceRoute(resource: PaidResource) {
   const merchantAddress =
@@ -40,7 +37,7 @@ export function createPaidResourceRoute(resource: PaidResource) {
     {
       accepts: {
         scheme: "exact",
-        price: dollarsFromCents(resource.amountCents),
+        price: `$${formatAtomicUsdc(resource.amountAtomic)}`,
         network: SOLANA_DEVNET_NETWORK,
         payTo: merchantAddress,
       },
