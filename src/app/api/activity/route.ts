@@ -1,5 +1,19 @@
 import { NextResponse } from "next/server";
+import { atomicUsdcFromDbValue } from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/server";
+
+function requireAtomic(value: unknown, label: string) {
+  const atomic = atomicUsdcFromDbValue(value);
+  if (atomic === null) throw new Error(`Invalid ${label}`);
+  return atomic;
+}
+
+function addAtomic(left: number, right: number, label: string) {
+  if (left > Number.MAX_SAFE_INTEGER - right) {
+    throw new Error(`${label} exceeds JavaScript safe integer range`);
+  }
+  return left + right;
+}
 
 export async function GET() {
   const supabase = await createClient();
@@ -45,7 +59,7 @@ export async function GET() {
     decision: string;
     settlement_status: string;
     amount_cents: number | null;
-    amount_atomic: number;
+    amount_atomic: unknown;
   }> = [];
 
   if (taskIds.length) {
@@ -66,38 +80,48 @@ export async function GET() {
     { approved: number; rejected: number; settled: number; settledAtomic: number }
   >();
 
-  for (const payment of payments) {
-    if (!payment.task_id) continue;
-    const current = stats.get(payment.task_id) ?? {
-      approved: 0,
-      rejected: 0,
-      settled: 0,
-      settledAtomic: 0,
-    };
-
-    if (payment.decision === "approved") current.approved += 1;
-    if (payment.decision === "rejected") current.rejected += 1;
-    if (payment.settlement_status === "settled") {
-      current.settled += 1;
-      const amountAtomic = Number(payment.amount_atomic ?? 0);
-      if (Number.isSafeInteger(amountAtomic) && amountAtomic >= 0) {
-        current.settledAtomic += amountAtomic;
-      }
-    }
-
-    stats.set(payment.task_id, current);
-  }
-
-  return NextResponse.json({
-    tasks: (tasks ?? []).map((task) => ({
-      ...task,
-      agent_name: agentNames.get(task.agent_id) ?? "Agent",
-      activity: stats.get(task.id) ?? {
+  try {
+    for (const payment of payments) {
+      if (!payment.task_id) continue;
+      const current = stats.get(payment.task_id) ?? {
         approved: 0,
         rejected: 0,
         settled: 0,
         settledAtomic: 0,
-      },
-    })),
-  });
+      };
+
+      if (payment.decision === "approved") current.approved += 1;
+      if (payment.decision === "rejected") current.rejected += 1;
+      if (payment.settlement_status === "settled") {
+        current.settled += 1;
+        current.settledAtomic = addAtomic(
+          current.settledAtomic,
+          requireAtomic(payment.amount_atomic, "settled payment amount"),
+          "task settled spend"
+        );
+      }
+
+      stats.set(payment.task_id, current);
+    }
+
+    return NextResponse.json({
+      tasks: (tasks ?? []).map((task) => ({
+        ...task,
+        budget_atomic: requireAtomic(task.budget_atomic, "task budget"),
+        spent_atomic: requireAtomic(task.spent_atomic, "task spend"),
+        agent_name: agentNames.get(task.agent_id) ?? "Agent",
+        activity: stats.get(task.id) ?? {
+          approved: 0,
+          rejected: 0,
+          settled: 0,
+          settledAtomic: 0,
+        },
+      })),
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid atomic ledger data" },
+      { status: 500 }
+    );
+  }
 }
