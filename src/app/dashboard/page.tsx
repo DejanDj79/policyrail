@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import {
+  centsToAtomicUsdc,
+  formatAtomicUsdDisplay,
+} from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/client";
 import styles from "./dashboard.module.css";
 
@@ -17,12 +21,16 @@ type DashboardPayload = {
     task_budget_cents: number;
     daily_budget_cents: number;
     max_transaction_cents: number;
+    task_budget_atomic: number;
+    daily_budget_atomic: number;
+    max_transaction_atomic: number;
     allowed_categories: string[];
     blocked_providers: string[];
     updated_at: string;
   } | null;
   summary: {
-    settled24hCents: number;
+    settled24hAtomic: number;
+    settled24hCents: number | null;
     completedTasks: number;
     rejectedPayments: number;
     settledPayments: number;
@@ -32,7 +40,9 @@ type DashboardPayload = {
     prompt: string;
     status: string;
     budget_cents: number;
+    budget_atomic: number | null;
     spent_cents: number;
+    spent_atomic: number | null;
     result: string | null;
     created_at: string;
     completed_at: string | null;
@@ -43,7 +53,8 @@ type DashboardPayload = {
     provider: string;
     resource: string;
     category: string;
-    amount_cents: number;
+    amount_cents: number | null;
+    amount_atomic: number;
     decision: string;
     decision_code: string;
     reason: string;
@@ -62,8 +73,15 @@ type WalletPayload = {
   error?: string;
 };
 
-function money(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
+function atomicOrCents(
+  atomic: number | null | undefined,
+  cents: number | null | undefined
+) {
+  if (Number.isSafeInteger(atomic) && Number(atomic) >= 0) return Number(atomic);
+  if (Number.isSafeInteger(cents) && Number(cents) >= 0) {
+    return centsToAtomicUsdc(Number(cents));
+  }
+  return 0;
 }
 
 function shortSignature(signature: string) {
@@ -138,10 +156,14 @@ export default function DashboardPage() {
   }, [supabase]);
 
   const dailyUsagePercent = useMemo(() => {
-    if (!data?.policy?.daily_budget_cents) return 0;
+    const dailyBudgetAtomic = atomicOrCents(
+      data?.policy?.daily_budget_atomic,
+      data?.policy?.daily_budget_cents
+    );
+    if (!dailyBudgetAtomic) return 0;
     return Math.min(
       100,
-      Math.round((data.summary.settled24hCents / data.policy.daily_budget_cents) * 100)
+      Math.round((data?.summary.settled24hAtomic ?? 0) / dailyBudgetAtomic * 100)
     );
   }, [data]);
 
@@ -184,7 +206,7 @@ export default function DashboardPage() {
           <section className={styles.metrics}>
             <div className={styles.metric}>
               <span>Settled spend · 24h</span>
-              <strong>{money(data.summary.settled24hCents)}</strong>
+              <strong>{formatAtomicUsdDisplay(data.summary.settled24hAtomic)}</strong>
               <small>Real settled x402 payments</small>
             </div>
             <div className={styles.metric}>
@@ -235,15 +257,30 @@ export default function DashboardPage() {
               <div className={styles.policyRows}>
                 <div className={styles.policyRow}>
                   <span>Task budget</span>
-                  <strong>{money(data.policy?.task_budget_cents ?? 0)}</strong>
+                  <strong>
+                    {formatAtomicUsdDisplay(
+                      atomicOrCents(data.policy?.task_budget_atomic, data.policy?.task_budget_cents)
+                    )}
+                  </strong>
                 </div>
                 <div className={styles.policyRow}>
                   <span>Max transaction</span>
-                  <strong>{money(data.policy?.max_transaction_cents ?? 0)}</strong>
+                  <strong>
+                    {formatAtomicUsdDisplay(
+                      atomicOrCents(
+                        data.policy?.max_transaction_atomic,
+                        data.policy?.max_transaction_cents
+                      )
+                    )}
+                  </strong>
                 </div>
                 <div className={styles.policyRow}>
                   <span>Rolling 24h limit</span>
-                  <strong>{money(data.policy?.daily_budget_cents ?? 0)}</strong>
+                  <strong>
+                    {formatAtomicUsdDisplay(
+                      atomicOrCents(data.policy?.daily_budget_atomic, data.policy?.daily_budget_cents)
+                    )}
+                  </strong>
                 </div>
                 <div className={styles.policyRow}>
                   <span>Allowed categories</span>
@@ -288,8 +325,16 @@ export default function DashboardPage() {
                             </span>
                           </div>
                           <div className={styles.taskSpend}>
-                            <strong>{money(task.spent_cents)}</strong>
-                            <span>of {money(task.budget_cents)}</span>
+                            <strong>
+                              {formatAtomicUsdDisplay(
+                                atomicOrCents(task.spent_atomic, task.spent_cents)
+                              )}
+                            </strong>
+                            <span>
+                              of {formatAtomicUsdDisplay(
+                                atomicOrCents(task.budget_atomic, task.budget_cents)
+                              )}
+                            </span>
                           </div>
                         </div>
                         {task.result ? <p className={styles.result}>{task.result}</p> : null}
@@ -323,7 +368,11 @@ export default function DashboardPage() {
                           {payment.category} · {dateLabel(payment.created_at)}
                         </span>
                       </div>
-                      <span className={styles.paymentAmount}>{money(payment.amount_cents)}</span>
+                      <span className={styles.paymentAmount}>
+                        {formatAtomicUsdDisplay(
+                          atomicOrCents(payment.amount_atomic, payment.amount_cents)
+                        )}
+                      </span>
                     </div>
 
                     <div className={styles.badges}>
