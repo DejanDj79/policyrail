@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
+import { atomicUsdcFromDbValue } from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/server";
 
 interface RouteContext {
   params: Promise<{ taskId: string }>;
+}
+
+function requireAtomic(value: unknown, label: string) {
+  const atomic = atomicUsdcFromDbValue(value);
+  if (atomic === null) throw new Error(`Invalid ${label}`);
+  return atomic;
 }
 
 export async function GET(_request: Request, context: RouteContext) {
@@ -75,12 +82,24 @@ export async function GET(_request: Request, context: RouteContext) {
     );
   }
 
-  return NextResponse.json({
-    task: {
-      ...task,
-      agent_name: agent.name,
-    },
-    payments: paymentsResult.data ?? [],
-    events: eventsResult.data ?? [],
-  });
+  try {
+    return NextResponse.json({
+      task: {
+        ...task,
+        budget_atomic: requireAtomic(task.budget_atomic, "task budget"),
+        spent_atomic: requireAtomic(task.spent_atomic, "task spend"),
+        agent_name: agent.name,
+      },
+      payments: (paymentsResult.data ?? []).map((payment) => ({
+        ...payment,
+        amount_atomic: requireAtomic(payment.amount_atomic, "payment amount"),
+      })),
+      events: eventsResult.data ?? [],
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid atomic ledger data" },
+      { status: 500 }
+    );
+  }
 }
