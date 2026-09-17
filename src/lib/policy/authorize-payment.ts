@@ -69,6 +69,7 @@ const SPENDING_CATEGORIES = new Set<SpendingCategory>([
   "data",
   "compute",
   "inference",
+  "other",
 ]);
 
 function safeAtomic(value: unknown, label: string) {
