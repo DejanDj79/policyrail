@@ -1,3 +1,4 @@
+import { formatAtomicUsd } from "@/lib/money/usdc";
 import type {
   PaymentRequest,
   PolicyDecision,
@@ -15,17 +16,17 @@ function result(
     approved,
     code,
     reason,
-    remainingTaskBudgetCents: Math.max(
+    remainingTaskBudgetAtomic: Math.max(
       0,
-      policy.taskBudgetCents -
-        request.taskSpentCents -
-        (approved ? request.amountCents : 0)
+      policy.taskBudgetAtomic -
+        request.taskSpentAtomic -
+        (approved ? request.amountAtomic : 0)
     ),
-    remainingDailyBudgetCents: Math.max(
+    remainingDailyBudgetAtomic: Math.max(
       0,
-      policy.dailyBudgetCents -
-        request.dailySpentCents -
-        (approved ? request.amountCents : 0)
+      policy.dailyBudgetAtomic -
+        request.dailySpentAtomic -
+        (approved ? request.amountAtomic : 0)
     ),
   };
 }
@@ -59,19 +60,19 @@ export function evaluatePayment(
     );
   }
 
-  if (request.amountCents > policy.maxTransactionCents) {
+  if (request.amountAtomic > policy.maxTransactionAtomic) {
     return result(
       false,
       "TRANSACTION_LIMIT_EXCEEDED",
-      `Requested $${(request.amountCents / 100).toFixed(2)}, above the $${(
-        policy.maxTransactionCents / 100
-      ).toFixed(2)} per-transaction limit.`,
+      `Requested ${formatAtomicUsd(request.amountAtomic)}, above the ${formatAtomicUsd(
+        policy.maxTransactionAtomic
+      )} per-transaction limit.`,
       policy,
       request
     );
   }
 
-  if (request.taskSpentCents + request.amountCents > policy.taskBudgetCents) {
+  if (request.taskSpentAtomic + request.amountAtomic > policy.taskBudgetAtomic) {
     return result(
       false,
       "TASK_BUDGET_EXCEEDED",
@@ -81,7 +82,7 @@ export function evaluatePayment(
     );
   }
 
-  if (request.dailySpentCents + request.amountCents > policy.dailyBudgetCents) {
+  if (request.dailySpentAtomic + request.amountAtomic > policy.dailyBudgetAtomic) {
     return result(
       false,
       "DAILY_BUDGET_EXCEEDED",
