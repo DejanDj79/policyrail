@@ -41,6 +41,24 @@ export function atomicUsdcFromString(value: string) {
   }
 }
 
+export function atomicUsdcFromDecimalString(value: string) {
+  const normalized = value.trim();
+  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(normalized)) return null;
+
+  const [wholePart, fractionPart = ""] = normalized.split(".");
+
+  try {
+    const wholeAtomic = BigInt(wholePart) * BigInt(USDC_ATOMIC_PER_USDC);
+    const fractionalAtomic = BigInt(fractionPart.padEnd(6, "0"));
+    const atomic = wholeAtomic + fractionalAtomic;
+
+    if (atomic <= BigInt(0) || atomic > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+    return Number(atomic);
+  } catch {
+    return null;
+  }
+}
+
 export function atomicUsdcFromDbValue(value: unknown) {
   return nonNegativeSafeInteger(value);
 }
