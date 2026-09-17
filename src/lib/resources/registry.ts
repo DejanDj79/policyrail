@@ -11,6 +11,7 @@ import {
 import type { SpendingCategory } from "@/lib/policy/types";
 import { fetchBazaarCatalog } from "@/lib/resources/bazaar-client";
 import {
+  isExternalX402ExecutionEnabled,
   SOLANA_DEVNET_NETWORK,
   SOLANA_DEVNET_USDC_MINT,
 } from "@/lib/x402/config";
@@ -111,6 +112,9 @@ function mapBazaarItem(item: BazaarItem): RegistryResource | null {
 
   if (url.protocol !== "https:" && url.protocol !== "http:") return null;
 
+  // Procurement execution is deliberately locked to exact Solana Devnet USDC.
+  // Mainnet resources may be discovered by the read-only Bazaar preview, but they
+  // cannot enter the active procurement registry through this adapter.
   const requirement = (item.accepts as BazaarPaymentRequirement[]).find(
     (candidate) =>
       candidate?.scheme === "exact" &&
@@ -188,6 +192,11 @@ class BazaarResourceRegistry implements ResourceRegistry {
   };
 
   private async fetchResources() {
+    // Read-only Bazaar preview/probing is always allowed. External resources only
+    // enter autonomous procurement when both x402 settlement and the dedicated
+    // external-execution opt-in are enabled.
+    if (!isExternalX402ExecutionEnabled()) return [];
+
     const catalog = await fetchBazaarCatalog(100);
 
     return catalog.items

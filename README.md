@@ -49,6 +49,21 @@ The x402 client also has its own per-payment spend cap equal to the amount Polic
 
 When x402 is disabled, the same flow runs in `simulated` settlement mode so development can continue without a funded wallet.
 
+### External Bazaar execution safety
+
+Bazaar discovery and dry-run challenge probing are read-only and remain available independently of payment execution. Discovering an external x402 resource does not make it purchasable.
+
+External Bazaar resources only enter autonomous procurement when both of these gates are enabled:
+
+```env
+POLICYRAIL_X402_ENABLED=true
+POLICYRAIL_EXTERNAL_X402_ENABLED=true
+```
+
+The active Bazaar procurement adapter is additionally locked to `exact` USDC on **Solana Devnet**. Solana mainnet resources may be inspected by the read-only Bazaar preview and probe, but they cannot enter the executable procurement registry. This keeps mainnet signing disabled by construction while external execution is being introduced incrementally.
+
+`POLICYRAIL_RESOURCE_REGISTRY_MODE=hybrid` or `bazaar` controls which registry is selected; it does not by itself grant permission to spend on external endpoints.
+
 ## Stack
 
 - Next.js + TypeScript
@@ -109,6 +124,12 @@ After both wallets have Devnet USDC, change this line in `.env.local`:
 
 ```env
 POLICYRAIL_X402_ENABLED=true
+```
+
+Keep external Bazaar execution disabled unless you are deliberately testing external Devnet purchases:
+
+```env
+POLICYRAIL_EXTERNAL_X402_ENABLED=false
 ```
 
 The setup script also adds these values automatically when missing:

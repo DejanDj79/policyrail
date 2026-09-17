@@ -20,9 +20,17 @@ export function isX402Enabled() {
   return process.env.POLICYRAIL_X402_ENABLED === "true";
 }
 
+export function isExternalX402ExecutionEnabled() {
+  return (
+    isX402Enabled() &&
+    process.env.POLICYRAIL_EXTERNAL_X402_ENABLED === "true"
+  );
+}
+
 export function getX402Configuration() {
   return {
     enabled: isX402Enabled(),
+    externalExecutionEnabled: isExternalX402ExecutionEnabled(),
     agentPrivateKey: process.env.POLICYRAIL_AGENT_PRIVATE_KEY ?? null,
     agentAddress: process.env.POLICYRAIL_AGENT_ADDRESS ?? null,
     merchantAddress: process.env.POLICYRAIL_MERCHANT_ADDRESS ?? null,
