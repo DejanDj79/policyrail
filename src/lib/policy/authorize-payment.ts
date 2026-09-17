@@ -1,4 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  atomicUsdcToExactCents,
+  formatAtomicUsdc,
+} from "@/lib/money/usdc";
 import { evaluatePayment } from "@/lib/policy/engine";
 import type { SpendingCategory, SpendingPolicy } from "@/lib/policy/types";
 
@@ -15,7 +19,7 @@ export interface AuthorizationRequest {
   provider: string;
   resource: string;
   category: SpendingCategory;
-  amountCents: number;
+  amountAtomic: number;
 }
 
 export interface FinalizeSettlementRequest {
@@ -28,9 +32,13 @@ export async function authorizePaymentForTask(
   supabase: SupabaseClient,
   request: AuthorizationRequest
 ) {
+  if (!Number.isSafeInteger(request.amountAtomic) || request.amountAtomic <= 0) {
+    throw new Error("Invalid atomic USDC amount");
+  }
+
   const { data: task, error: taskError } = await supabase
     .from("tasks")
-    .select("id,agent_id,budget_cents,spent_cents,status")
+    .select("id,agent_id,budget_atomic,spent_atomic,status")
     .eq("id", request.taskId)
     .single();
 
@@ -45,7 +53,7 @@ export async function authorizePaymentForTask(
   const { data: storedPolicy, error: policyError } = await supabase
     .from("policies")
     .select(
-      "task_budget_cents,daily_budget_cents,max_transaction_cents,allowed_categories,blocked_providers"
+      "task_budget_atomic,daily_budget_atomic,max_transaction_atomic,allowed_categories,blocked_providers"
     )
     .eq("agent_id", task.agent_id)
     .single();
@@ -57,7 +65,7 @@ export async function authorizePaymentForTask(
   const rollingDayStart = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data: approvedPayments, error: spendError } = await supabase
     .from("payment_requests")
-    .select("amount_cents")
+    .select("amount_atomic")
     .eq("agent_id", task.agent_id)
     .eq("decision", "approved")
     .in("settlement_status", ["simulated", "settled"])
@@ -67,15 +75,18 @@ export async function authorizePaymentForTask(
     throw new Error(spendError.message);
   }
 
-  const dailySpentCents = (approvedPayments ?? []).reduce(
-    (sum, payment) => sum + payment.amount_cents,
+  const dailySpentAtomic = (approvedPayments ?? []).reduce(
+    (sum, payment) => sum + Number(payment.amount_atomic),
     0
   );
 
   const policy: SpendingPolicy = {
-    taskBudgetCents: Math.min(task.budget_cents, storedPolicy.task_budget_cents),
-    dailyBudgetCents: storedPolicy.daily_budget_cents,
-    maxTransactionCents: storedPolicy.max_transaction_cents,
+    taskBudgetAtomic: Math.min(
+      Number(task.budget_atomic),
+      Number(storedPolicy.task_budget_atomic)
+    ),
+    dailyBudgetAtomic: Number(storedPolicy.daily_budget_atomic),
+    maxTransactionAtomic: Number(storedPolicy.max_transaction_atomic),
     allowedCategories: storedPolicy.allowed_categories.filter((category: string) =>
       VALID_CATEGORIES.includes(category as SpendingCategory)
     ) as SpendingCategory[],
@@ -86,10 +97,12 @@ export async function authorizePaymentForTask(
     provider: request.provider.trim(),
     resource: request.resource.trim(),
     category: request.category,
-    amountCents: request.amountCents,
-    taskSpentCents: task.spent_cents,
-    dailySpentCents,
+    amountAtomic: request.amountAtomic,
+    taskSpentAtomic: Number(task.spent_atomic),
+    dailySpentAtomic,
   });
+
+  const legacyAmountCents = atomicUsdcToExactCents(request.amountAtomic);
 
   const { data: paymentRequest, error: paymentInsertError } = await supabase
     .from("payment_requests")
@@ -99,7 +112,8 @@ export async function authorizePaymentForTask(
       provider: request.provider.trim(),
       resource: request.resource.trim(),
       category: request.category,
-      amount_cents: request.amountCents,
+      amount_atomic: request.amountAtomic,
+      amount_cents: legacyAmountCents,
       decision: decision.approved ? "approved" : "rejected",
       decision_code: decision.code,
       reason: decision.reason,
@@ -121,11 +135,13 @@ export async function authorizePaymentForTask(
       provider: request.provider.trim(),
       resource: request.resource.trim(),
       category: request.category,
-      amount_cents: request.amountCents,
+      amount_atomic: request.amountAtomic,
+      amount_usdc: formatAtomicUsdc(request.amountAtomic),
+      amount_cents: legacyAmountCents,
       decision_code: decision.code,
       reason: decision.reason,
       settlement_status: decision.approved ? "authorized" : "not_applicable",
-      effective_task_budget_cents: policy.taskBudgetCents,
+      effective_task_budget_atomic: policy.taskBudgetAtomic,
     },
   });
 
