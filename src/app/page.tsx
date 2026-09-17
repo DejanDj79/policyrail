@@ -26,6 +26,31 @@ type Policy = {
   blocked_providers: string[];
 };
 
+type PolicyRequiredChange = {
+  field: "provider" | "category" | "amountAtomic";
+  operator: "not_in" | "in" | "lte";
+  maxAtomic?: number;
+  allowedCategories?: string[];
+  blockedProviders?: string[];
+};
+
+type PolicyConstraintEnvelope = {
+  policyId: string;
+  policyUpdatedAt: string;
+  effectiveTaskBudgetAtomic: number;
+  dailyBudgetAtomic: number;
+  maxTransactionAtomic: number;
+  remainingTaskBudgetAtomic: number;
+  remainingDailyBudgetAtomic: number;
+  maxCompliantAmountAtomic: number;
+  allowedCategories: string[];
+  blockedProviders: string[];
+  providerAllowed: boolean;
+  categoryAllowed: boolean;
+  retryAllowed: boolean;
+  requiredChange: PolicyRequiredChange | null;
+};
+
 type AgentAttempt = {
   resourceId: string;
   resourceName: string;
@@ -36,6 +61,7 @@ type AgentAttempt = {
   approved: boolean;
   policyReason: string;
   decisionCode: string;
+  policyEnvelope: PolicyConstraintEnvelope;
   settlementStatus: "not_applicable" | "simulated" | "settled";
   settlementNetwork: string;
   settlementAsset: string;
@@ -69,6 +95,25 @@ function settlementModeLabel(mode: string) {
   if (mode === "x402-solana-mixed") return "x402 / mixed Solana networks";
   if (mode === "x402-enabled-no-settlement") return "x402 enabled / no settlement";
   return mode;
+}
+
+function requiredChangeLabel(envelope: PolicyConstraintEnvelope) {
+  const change = envelope.requiredChange;
+  if (!change) return "No policy correction is required.";
+
+  if (change.field === "amountAtomic") {
+    const maxAtomic = change.maxAtomic ?? envelope.maxCompliantAmountAtomic;
+    return `Retry with a resource priced at or below ${formatAtomicUsdDisplay(maxAtomic)}.`;
+  }
+
+  if (change.field === "category") {
+    return `Choose a resource in an allowed category: ${(change.allowedCategories ?? envelope.allowedCategories).join(", ")}.`;
+  }
+
+  const blocked = change.blockedProviders ?? envelope.blockedProviders;
+  return blocked.length > 0
+    ? `Choose a different provider. Blocked: ${blocked.join(", ")}.`
+    : "Choose a different provider.";
 }
 
 export default function Home() {
@@ -215,11 +260,11 @@ export default function Home() {
         <h1>
           AI decides what to buy.
           <br />
-          <span>PolicyRail decides what it can spend.</span>
+          <span>PolicyRail defines the economic boundaries.</span>
         </h1>
         <p className="lede">
-          Give AI agents economic autonomy without giving them unrestricted
-          access to your money.
+          PolicyRail does not just block unsafe spending. It returns machine-readable
+          constraints so autonomous agents can find a compliant alternative and keep working.
         </p>
       </section>
 
@@ -295,15 +340,15 @@ export default function Home() {
         <div className="panel audit">
           <div className="panelHeader">
             <div>
-              <p className="label">LIVE AUDIT TRAIL</p>
-              <h2>Agent intent → policy → settlement</h2>
+              <p className="label">LIVE POLICY NEGOTIATION</p>
+              <h2>Agent intent → policy feedback → adaptation → settlement</h2>
             </div>
           </div>
 
           {events.length === 0 ? (
             <div className="empty">
-              Run the agent to watch AI procurement decisions get evaluated by
-              deterministic spending policy.
+              Run the agent to watch PolicyRail turn rejected purchases into
+              machine-readable constraints the agent can adapt to.
             </div>
           ) : (
             <div className="events">
@@ -323,9 +368,22 @@ export default function Home() {
                   </div>
 
                   <div className="decisionDetail policyDetail">
-                    <span>PolicyRail</span>
+                    <span>PolicyRail · {event.decisionCode}</span>
                     <p>{event.policyReason}</p>
                   </div>
+
+                  {!event.approved ? (
+                    <div className="decisionDetail policyDetail">
+                      <span>Constraint envelope → returned to agent</span>
+                      <p>{requiredChangeLabel(event.policyEnvelope)}</p>
+                      <p>
+                        Max compliant {formatAtomicUsdDisplay(event.policyEnvelope.maxCompliantAmountAtomic)}
+                        {" · "}Task remaining {formatAtomicUsdDisplay(event.policyEnvelope.remainingTaskBudgetAtomic)}
+                        {" · "}Daily remaining {formatAtomicUsdDisplay(event.policyEnvelope.remainingDailyBudgetAtomic)}
+                        {" · "}Retry {event.policyEnvelope.retryAllowed ? "allowed" : "blocked"}
+                      </p>
+                    </div>
+                  ) : null}
 
                   {event.approved ? (
                     <div className="decisionDetail settlementDetail">
@@ -359,7 +417,9 @@ export default function Home() {
       <section className="flow">
         <span>AI procurement intent</span>
         <b>→</b>
-        <span>PolicyRail authorization</span>
+        <span>PolicyRail constraint envelope</span>
+        <b>→</b>
+        <span>Agent adapts autonomously</span>
         <b>→</b>
         <span>x402 / Solana settlement</span>
       </section>
