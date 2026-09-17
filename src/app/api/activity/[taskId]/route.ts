@@ -18,7 +18,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const { data: task, error: taskError } = await supabase
     .from("tasks")
     .select(
-      "id,agent_id,prompt,status,budget_cents,spent_cents,result,created_at,completed_at"
+      "id,agent_id,prompt,status,budget_cents,budget_atomic,spent_cents,spent_atomic,result,created_at,completed_at"
     )
     .eq("id", taskId)
     .maybeSingle();
@@ -50,7 +50,7 @@ export async function GET(_request: Request, context: RouteContext) {
     supabase
       .from("payment_requests")
       .select(
-        "id,provider,resource,category,amount_cents,decision,decision_code,reason,settlement_status,transaction_signature,created_at,settled_at"
+        "id,provider,resource,category,amount_cents,amount_atomic,decision,decision_code,reason,settlement_status,transaction_signature,created_at,settled_at"
       )
       .eq("task_id", task.id)
       .order("created_at", { ascending: true }),
