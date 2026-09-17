@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
+    "money:check": "node --experimental-strip-types scripts/check-usdc-money.ts",
     "wallet:setup": "node scripts/setup-devnet-wallets.mjs"
   },
   "dependencies": {
