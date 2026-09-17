@@ -18,12 +18,38 @@ export interface FinalizeSettlementRequest {
   transactionSignature?: string | null;
 }
 
+export interface PolicyRequiredChange {
+  field: "provider" | "category" | "amountAtomic";
+  operator: "not_in" | "in" | "lte";
+  maxAtomic?: number;
+  allowedCategories?: SpendingCategory[];
+  blockedProviders?: string[];
+}
+
+export interface PolicyConstraintEnvelope {
+  policyId: string;
+  policyUpdatedAt: string;
+  effectiveTaskBudgetAtomic: number;
+  dailyBudgetAtomic: number;
+  maxTransactionAtomic: number;
+  remainingTaskBudgetAtomic: number;
+  remainingDailyBudgetAtomic: number;
+  maxCompliantAmountAtomic: number;
+  allowedCategories: SpendingCategory[];
+  blockedProviders: string[];
+  providerAllowed: boolean;
+  categoryAllowed: boolean;
+  retryAllowed: boolean;
+  requiredChange: PolicyRequiredChange | null;
+}
+
 interface AtomicAuthorizationResult {
   approved: boolean;
   code: PolicyDecisionCode;
   reason: string;
   remainingTaskBudgetAtomic: number;
   remainingDailyBudgetAtomic: number;
+  policyEnvelope: PolicyConstraintEnvelope;
   paymentRequestId: string;
   agentId: string;
   taskId: string;
@@ -36,6 +62,13 @@ const DECISION_CODES = new Set<PolicyDecisionCode>([
   "TRANSACTION_LIMIT_EXCEEDED",
   "CATEGORY_NOT_ALLOWED",
   "PROVIDER_BLOCKED",
+]);
+
+const SPENDING_CATEGORIES = new Set<SpendingCategory>([
+  "search",
+  "data",
+  "compute",
+  "inference",
 ]);
 
 function safeAtomic(value: unknown, label: string) {
@@ -51,6 +84,104 @@ function safeAtomic(value: unknown, label: string) {
   }
 
   return parsed;
+}
+
+function stringArray(value: unknown, label: string) {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
+    throw new Error(`Invalid ${label} returned by authorization RPC`);
+  }
+  return value as string[];
+}
+
+function categoryArray(value: unknown) {
+  const values = stringArray(value, "allowed categories");
+  if (!values.every((item) => SPENDING_CATEGORIES.has(item as SpendingCategory))) {
+    throw new Error("Invalid allowed category returned by authorization RPC");
+  }
+  return values as SpendingCategory[];
+}
+
+function parseRequiredChange(value: unknown): PolicyRequiredChange | null {
+  if (value === null || value === undefined) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Invalid policy required change");
+  }
+
+  const change = value as Record<string, unknown>;
+  const field = change.field;
+  const operator = change.operator;
+
+  if (
+    field !== "provider" &&
+    field !== "category" &&
+    field !== "amountAtomic"
+  ) {
+    throw new Error("Invalid policy required-change field");
+  }
+  if (operator !== "not_in" && operator !== "in" && operator !== "lte") {
+    throw new Error("Invalid policy required-change operator");
+  }
+
+  const parsed: PolicyRequiredChange = { field, operator };
+  if (change.maxAtomic !== undefined) {
+    parsed.maxAtomic = safeAtomic(change.maxAtomic, "required-change max amount");
+  }
+  if (change.allowedCategories !== undefined) {
+    parsed.allowedCategories = categoryArray(change.allowedCategories);
+  }
+  if (change.blockedProviders !== undefined) {
+    parsed.blockedProviders = stringArray(change.blockedProviders, "blocked providers");
+  }
+  return parsed;
+}
+
+function parsePolicyEnvelope(value: unknown): PolicyConstraintEnvelope {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Invalid policy constraint envelope");
+  }
+
+  const envelope = value as Record<string, unknown>;
+  if (
+    typeof envelope.policyId !== "string" ||
+    typeof envelope.policyUpdatedAt !== "string" ||
+    typeof envelope.providerAllowed !== "boolean" ||
+    typeof envelope.categoryAllowed !== "boolean" ||
+    typeof envelope.retryAllowed !== "boolean"
+  ) {
+    throw new Error("Invalid policy constraint envelope metadata");
+  }
+
+  return {
+    policyId: envelope.policyId,
+    policyUpdatedAt: envelope.policyUpdatedAt,
+    effectiveTaskBudgetAtomic: safeAtomic(
+      envelope.effectiveTaskBudgetAtomic,
+      "effective task budget"
+    ),
+    dailyBudgetAtomic: safeAtomic(envelope.dailyBudgetAtomic, "daily budget"),
+    maxTransactionAtomic: safeAtomic(
+      envelope.maxTransactionAtomic,
+      "max transaction"
+    ),
+    remainingTaskBudgetAtomic: safeAtomic(
+      envelope.remainingTaskBudgetAtomic,
+      "remaining task budget"
+    ),
+    remainingDailyBudgetAtomic: safeAtomic(
+      envelope.remainingDailyBudgetAtomic,
+      "remaining daily budget"
+    ),
+    maxCompliantAmountAtomic: safeAtomic(
+      envelope.maxCompliantAmountAtomic,
+      "max compliant amount"
+    ),
+    allowedCategories: categoryArray(envelope.allowedCategories),
+    blockedProviders: stringArray(envelope.blockedProviders, "blocked providers"),
+    providerAllowed: envelope.providerAllowed,
+    categoryAllowed: envelope.categoryAllowed,
+    retryAllowed: envelope.retryAllowed,
+    requiredChange: parseRequiredChange(envelope.requiredChange),
+  };
 }
 
 function parseAuthorizationResult(value: unknown): AtomicAuthorizationResult {
@@ -92,6 +223,7 @@ function parseAuthorizationResult(value: unknown): AtomicAuthorizationResult {
       result.remainingDailyBudgetAtomic,
       "remaining daily budget"
     ),
+    policyEnvelope: parsePolicyEnvelope(result.policyEnvelope),
     paymentRequestId: result.paymentRequestId,
     agentId: result.agentId,
     taskId: result.taskId,
