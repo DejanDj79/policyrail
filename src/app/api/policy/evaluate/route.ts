@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { centsToAtomicUsdc } from "@/lib/money/usdc";
 import { authorizePaymentForTask } from "@/lib/policy/authorize-payment";
 import type { SpendingCategory } from "@/lib/policy/types";
 import { createClient } from "@/lib/supabase/server";
@@ -8,6 +9,7 @@ interface EvaluateBody {
   provider?: string;
   resource?: string;
   category?: SpendingCategory;
+  amountAtomic?: number;
   amountCents?: number;
 }
 
@@ -35,14 +37,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
+  const amountAtomic = Number.isSafeInteger(body.amountAtomic) && (body.amountAtomic ?? 0) > 0
+    ? (body.amountAtomic as number)
+    : Number.isSafeInteger(body.amountCents) && (body.amountCents ?? 0) > 0
+      ? centsToAtomicUsdc(body.amountCents as number)
+      : null;
+
   if (
     !body.taskId ||
     !body.provider?.trim() ||
     !body.resource?.trim() ||
     !body.category ||
     !VALID_CATEGORIES.includes(body.category) ||
-    !Number.isInteger(body.amountCents) ||
-    (body.amountCents ?? 0) <= 0
+    amountAtomic === null
   ) {
     return NextResponse.json({ error: "Invalid payment request" }, { status: 400 });
   }
@@ -53,7 +60,7 @@ export async function POST(request: Request) {
       provider: body.provider,
       resource: body.resource,
       category: body.category,
-      amountCents: body.amountCents as number,
+      amountAtomic,
     });
 
     return NextResponse.json(decision);
