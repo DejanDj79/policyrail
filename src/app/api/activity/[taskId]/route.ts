@@ -53,7 +53,7 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
   }
 
-  const [paymentsResult, eventsResult] = await Promise.all([
+  const [paymentsResult, eventsResult, receiptsResult] = await Promise.all([
     supabase
       .from("payment_requests")
       .select(
@@ -64,6 +64,11 @@ export async function GET(_request: Request, context: RouteContext) {
     supabase
       .from("audit_events")
       .select("id,payment_request_id,event_type,payload,created_at")
+      .eq("task_id", task.id)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("policy_decision_receipts")
+      .select("id,payment_request_id,policy_id,receipt_version,receipt,receipt_hash,created_at")
       .eq("task_id", task.id)
       .order("created_at", { ascending: true }),
   ]);
@@ -82,6 +87,13 @@ export async function GET(_request: Request, context: RouteContext) {
     );
   }
 
+  if (receiptsResult.error) {
+    return NextResponse.json(
+      { error: receiptsResult.error.message },
+      { status: 500 }
+    );
+  }
+
   try {
     return NextResponse.json({
       task: {
@@ -95,6 +107,7 @@ export async function GET(_request: Request, context: RouteContext) {
         amount_atomic: requireAtomic(payment.amount_atomic, "payment amount"),
       })),
       events: eventsResult.data ?? [],
+      receipts: receiptsResult.data ?? [],
     });
   } catch (error) {
     return NextResponse.json(
