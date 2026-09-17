@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { centsToAtomicUsdc } from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/server";
 import type { SpendingCategory } from "@/lib/policy/types";
 
@@ -85,10 +84,6 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const taskBudgetAtomic = centsToAtomicUsdc(taskBudgetCents);
-  const dailyBudgetAtomic = centsToAtomicUsdc(dailyBudgetCents);
-  const maxTransactionAtomic = centsToAtomicUsdc(maxTransactionCents);
-
   const allowedCategories = Array.from(
     new Set((body.allowedCategories ?? []).filter((category) =>
       VALID_CATEGORIES.includes(category as SpendingCategory)
@@ -133,9 +128,6 @@ export async function PATCH(request: Request) {
       task_budget_cents: taskBudgetCents,
       daily_budget_cents: dailyBudgetCents,
       max_transaction_cents: maxTransactionCents,
-      task_budget_atomic: taskBudgetAtomic,
-      daily_budget_atomic: dailyBudgetAtomic,
-      max_transaction_atomic: maxTransactionAtomic,
       allowed_categories: allowedCategories,
       blocked_providers: blockedProviders,
     })
