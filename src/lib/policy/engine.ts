@@ -5,6 +5,27 @@ import type {
   SpendingPolicy,
 } from "./types";
 
+function assertNonNegativeAtomic(value: number, label: string) {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`${label} must be a non-negative safe integer atomic USDC amount.`);
+  }
+}
+
+function assertPositiveAtomic(value: number, label: string) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${label} must be a positive safe integer atomic USDC amount.`);
+  }
+}
+
+function assertPolicyInputs(policy: SpendingPolicy, request: PaymentRequest) {
+  assertNonNegativeAtomic(policy.taskBudgetAtomic, "Task budget");
+  assertNonNegativeAtomic(policy.dailyBudgetAtomic, "Daily budget");
+  assertNonNegativeAtomic(policy.maxTransactionAtomic, "Transaction limit");
+  assertPositiveAtomic(request.amountAtomic, "Payment amount");
+  assertNonNegativeAtomic(request.taskSpentAtomic, "Task spend");
+  assertNonNegativeAtomic(request.dailySpentAtomic, "Daily spend");
+}
+
 function result(
   approved: boolean,
   code: PolicyDecision["code"],
@@ -12,21 +33,20 @@ function result(
   policy: SpendingPolicy,
   request: PaymentRequest
 ): PolicyDecision {
+  const taskCharge = approved ? request.amountAtomic : 0;
+  const dailyCharge = approved ? request.amountAtomic : 0;
+
   return {
     approved,
     code,
     reason,
     remainingTaskBudgetAtomic: Math.max(
       0,
-      policy.taskBudgetAtomic -
-        request.taskSpentAtomic -
-        (approved ? request.amountAtomic : 0)
+      policy.taskBudgetAtomic - request.taskSpentAtomic - taskCharge
     ),
     remainingDailyBudgetAtomic: Math.max(
       0,
-      policy.dailyBudgetAtomic -
-        request.dailySpentAtomic -
-        (approved ? request.amountAtomic : 0)
+      policy.dailyBudgetAtomic - request.dailySpentAtomic - dailyCharge
     ),
   };
 }
@@ -35,6 +55,8 @@ export function evaluatePayment(
   policy: SpendingPolicy,
   request: PaymentRequest
 ): PolicyDecision {
+  assertPolicyInputs(policy, request);
+
   const provider = request.provider.trim().toLowerCase();
   const blocked = policy.blockedProviders.map((item) =>
     item.trim().toLowerCase()
@@ -72,7 +94,10 @@ export function evaluatePayment(
     );
   }
 
-  if (request.taskSpentAtomic + request.amountAtomic > policy.taskBudgetAtomic) {
+  if (
+    request.taskSpentAtomic > policy.taskBudgetAtomic ||
+    request.amountAtomic > policy.taskBudgetAtomic - request.taskSpentAtomic
+  ) {
     return result(
       false,
       "TASK_BUDGET_EXCEEDED",
@@ -82,7 +107,10 @@ export function evaluatePayment(
     );
   }
 
-  if (request.dailySpentAtomic + request.amountAtomic > policy.dailyBudgetAtomic) {
+  if (
+    request.dailySpentAtomic > policy.dailyBudgetAtomic ||
+    request.amountAtomic > policy.dailyBudgetAtomic - request.dailySpentAtomic
+  ) {
     return result(
       false,
       "DAILY_BUDGET_EXCEEDED",
