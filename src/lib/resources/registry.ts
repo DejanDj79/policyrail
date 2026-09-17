@@ -3,6 +3,11 @@ import {
   DEMO_RESOURCES,
   type PaidResource,
 } from "@/lib/agent/resources";
+import {
+  atomicUsdcFromString,
+  atomicUsdcToExactCents,
+  formatAtomicUsdc,
+} from "@/lib/money/usdc";
 import type { SpendingCategory } from "@/lib/policy/types";
 import { fetchBazaarCatalog } from "@/lib/resources/bazaar-client";
 import {
@@ -73,24 +78,6 @@ function deriveCategory(text: string): SpendingCategory {
   return "data";
 }
 
-function centsFromAtomicUsdc(amount: string) {
-  try {
-    const atomic = BigInt(amount);
-    const zero = BigInt(0);
-    const atomicPerCent = BigInt(10_000);
-
-    // PolicyRail's current ledger stores integer cents. Ignore sub-cent or
-    // fractional-cent Bazaar prices until the ledger moves to atomic USDC units.
-    if (atomic <= zero || atomic % atomicPerCent !== zero) return null;
-
-    const cents = atomic / atomicPerCent;
-    if (cents > BigInt(Number.MAX_SAFE_INTEGER)) return null;
-    return Number(cents);
-  } catch {
-    return null;
-  }
-}
-
 function stableResourceId(resourceUrl: string) {
   return `bazaar-${createHash("sha256").update(resourceUrl).digest("hex").slice(0, 12)}`;
 }
@@ -134,8 +121,9 @@ function mapBazaarItem(item: BazaarItem): RegistryResource | null {
 
   if (!requirement || typeof requirement.amount !== "string") return null;
 
-  const amountCents = centsFromAtomicUsdc(requirement.amount);
-  if (amountCents === null) return null;
+  const amountAtomic = atomicUsdcFromString(requirement.amount);
+  if (amountAtomic === null) return null;
+  const amountCents = atomicUsdcToExactCents(amountAtomic);
 
   const bazaarInfo = nestedRecord(item.extensions, "bazaar", "info");
   const input = bazaarInfo && isRecord(bazaarInfo.input) ? bazaarInfo.input : null;
@@ -163,6 +151,7 @@ function mapBazaarItem(item: BazaarItem): RegistryResource | null {
     domain: "x402 Bazaar",
     tags,
     category: deriveCategory(`${displayName} ${description}`),
+    amountAtomic,
     amountCents,
     qualityScore: 70,
     description,
@@ -284,7 +273,9 @@ export function toPublicResourceMetadata(resource: RegistryResource) {
     domain: resource.domain,
     tags: resource.tags,
     category: resource.category,
+    amountAtomic: resource.amountAtomic,
     amountCents: resource.amountCents,
+    priceUsdc: formatAtomicUsdc(resource.amountAtomic),
     qualityScore: resource.qualityScore,
     description: resource.description,
     synthetic: !resource.purchaseUrl,
