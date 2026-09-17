@@ -25,6 +25,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Atomic USDC invariants
+        run: npm run money:check
+
       - name: Build
         run: npm run build
         env:
