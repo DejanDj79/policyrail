@@ -5,6 +5,9 @@ import {
   formatAtomicUsdc,
 } from "@/lib/money/usdc";
 import {
+  isExternalX402ExecutionEnabled,
+  isMainnetX402ExecutionEnabled,
+  isX402Enabled,
   SOLANA_DEVNET_NETWORK,
   SOLANA_DEVNET_USDC_MINT,
   SOLANA_MAINNET_NETWORK,
@@ -14,6 +17,8 @@ import {
 const SAMPLE_LIMIT = 100;
 const DISTRIBUTION_LIMIT = 8;
 const MAINNET_RESOURCE_LIMIT = 12;
+
+type RegistryMode = "local-demo" | "bazaar" | "hybrid";
 
 type BazaarRequirement = {
   scheme?: unknown;
@@ -60,6 +65,15 @@ export interface BazaarPreviewResult {
   facilitator: string;
   checkedAt: string;
   sampleLimit: number;
+  execution: {
+    registryMode: RegistryMode;
+    externalRegistrySelected: boolean;
+    x402Enabled: boolean;
+    externalExecutionEnabled: boolean;
+    mainnetExecutionEnabled: boolean;
+    devnetExecutableResources: number;
+    mainnetExecutableResources: number;
+  };
   filters: {
     type: "http";
     method: "GET";
@@ -98,6 +112,12 @@ export interface BazaarPreviewResult {
     resources: BazaarMainnetPreviewResource[];
   };
   resources: BazaarPreviewResource[];
+}
+
+function registryMode(): RegistryMode {
+  const value = process.env.POLICYRAIL_RESOURCE_REGISTRY_MODE;
+  if (value === "bazaar" || value === "hybrid") return value;
+  return "local-demo";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -312,12 +332,30 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
   const sortedMainnetResources = [...mainnetResources].sort(
     (a, b) => Number(b.ledgerCompatible) - Number(a.ledgerCompatible)
   );
+  const mode = registryMode();
+  const externalRegistrySelected = mode === "bazaar" || mode === "hybrid";
+  const x402Enabled = isX402Enabled();
+  const externalExecutionEnabled = isExternalX402ExecutionEnabled();
+  const mainnetExecutionEnabled = isMainnetX402ExecutionEnabled();
 
   return {
     source: catalog.source,
     facilitator: catalog.baseUrl,
     checkedAt: new Date().toISOString(),
     sampleLimit: SAMPLE_LIMIT,
+    execution: {
+      registryMode: mode,
+      externalRegistrySelected,
+      x402Enabled,
+      externalExecutionEnabled,
+      mainnetExecutionEnabled,
+      devnetExecutableResources:
+        externalRegistrySelected && externalExecutionEnabled ? compatible.length : 0,
+      mainnetExecutableResources:
+        externalRegistrySelected && mainnetExecutionEnabled
+          ? mainnetAtomicLedgerResources
+          : 0,
+    },
     filters: {
       type: "http",
       method: "GET",
