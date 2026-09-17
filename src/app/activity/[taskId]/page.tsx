@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import {
+  centsToAtomicUsdc,
+  formatAtomicUsdDisplay,
+} from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/client";
 import styles from "../activity.module.css";
 
@@ -11,7 +15,8 @@ type Payment = {
   provider: string;
   resource: string;
   category: string;
-  amount_cents: number;
+  amount_cents: number | null;
+  amount_atomic: number;
   decision: string;
   decision_code: string;
   reason: string;
@@ -37,7 +42,9 @@ type DetailPayload = {
     prompt: string;
     status: string;
     budget_cents: number;
+    budget_atomic: number | null;
     spent_cents: number;
+    spent_atomic: number | null;
     result: string | null;
     created_at: string;
     completed_at: string | null;
@@ -47,8 +54,15 @@ type DetailPayload = {
   error?: string;
 };
 
-function money(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
+function atomicOrCents(
+  atomic: number | null | undefined,
+  cents: number | null | undefined
+) {
+  if (Number.isSafeInteger(atomic) && Number(atomic) >= 0) return Number(atomic);
+  if (Number.isSafeInteger(cents) && Number(cents) >= 0) {
+    return centsToAtomicUsdc(Number(cents));
+  }
+  return 0;
 }
 
 function dateLabel(value: string) {
@@ -68,7 +82,30 @@ function payloadText(payload: Record<string, unknown> | null, key: string) {
 
 function payloadNumber(payload: Record<string, unknown> | null, key: string) {
   const value = payload?.[key];
-  return typeof value === "number" ? value : null;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function payloadAtomic(payload: Record<string, unknown> | null, key: string) {
+  const value = payload?.[key];
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
+    return value;
+  }
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) {
+    const parsed = Number(value);
+    if (Number.isSafeInteger(parsed) && parsed >= 0) return parsed;
+  }
+  return null;
+}
+
+function payloadMoney(payload: Record<string, unknown> | null) {
+  const atomic = payloadAtomic(payload, "amount_atomic");
+  if (atomic !== null) return formatAtomicUsdDisplay(atomic);
+
+  const cents = payloadNumber(payload, "amount_cents");
+  if (cents !== null && Number.isSafeInteger(cents) && cents >= 0) {
+    return formatAtomicUsdDisplay(centsToAtomicUsdc(cents));
+  }
+  return null;
 }
 
 function payloadStringArray(payload: Record<string, unknown> | null, key: string) {
@@ -109,8 +146,15 @@ function eventTitle(event: AuditEvent) {
 function eventBody(event: AuditEvent) {
   const payload = event.payload;
   if (event.event_type === "task_created") {
-    const budget = payloadNumber(payload, "budget_cents");
-    return budget === null ? "The autonomous task entered the policy-controlled execution flow." : `Task budget set to ${money(budget)}.`;
+    const budgetAtomic = payloadAtomic(payload, "budget_atomic");
+    if (budgetAtomic !== null) {
+      return `Task budget set to ${formatAtomicUsdDisplay(budgetAtomic)}.`;
+    }
+
+    const budgetCents = payloadNumber(payload, "budget_cents");
+    return budgetCents === null
+      ? "The autonomous task entered the policy-controlled execution flow."
+      : `Task budget set to ${formatAtomicUsdDisplay(centsToAtomicUsdc(budgetCents))}.`;
   }
   if (event.event_type === "resource_discovery_completed") {
     const resources = payloadStringArray(payload, "resource_ids");
@@ -241,12 +285,20 @@ export default function ActivityDetailPage() {
           <section className={styles.summaryGrid}>
             <div className={styles.summaryCard}>
               <span>Task budget</span>
-              <strong>{money(task.budget_cents)}</strong>
+              <strong>
+                {formatAtomicUsdDisplay(
+                  atomicOrCents(task.budget_atomic, task.budget_cents)
+                )}
+              </strong>
               <small>Execution ceiling</small>
             </div>
             <div className={styles.summaryCard}>
               <span>Actual spend</span>
-              <strong>{money(task.spent_cents)}</strong>
+              <strong>
+                {formatAtomicUsdDisplay(
+                  atomicOrCents(task.spent_atomic, task.spent_cents)
+                )}
+              </strong>
               <small>Settled spend</small>
             </div>
             <div className={styles.summaryCard}>
@@ -272,7 +324,7 @@ export default function ActivityDetailPage() {
 
               <div className={styles.timeline}>
                 {data.events.map((event) => {
-                  const amount = payloadNumber(event.payload, "amount_cents");
+                  const amount = payloadMoney(event.payload);
                   const decisionCode = payloadText(event.payload, "decision_code");
                   const signature = payloadText(event.payload, "transaction_signature");
                   const provider = payloadText(event.payload, "provider");
@@ -286,7 +338,7 @@ export default function ActivityDetailPage() {
                       <p className={styles.timelineBody}>{eventBody(event)}</p>
                       <div className={styles.eventMeta}>
                         {provider ? <span>{provider}</span> : null}
-                        {amount !== null ? <span>{money(amount)}</span> : null}
+                        {amount ? <span>{amount}</span> : null}
                         {decisionCode ? <span>{decisionCode}</span> : null}
                       </div>
                       {signature ? (
@@ -322,7 +374,11 @@ export default function ActivityDetailPage() {
                           <strong>{payment.provider}</strong>
                           <div className={styles.paymentMeta}>{payment.resource} · {payment.category}</div>
                         </div>
-                        <span>{money(payment.amount_cents)}</span>
+                        <span>
+                          {formatAtomicUsdDisplay(
+                            atomicOrCents(payment.amount_atomic, payment.amount_cents)
+                          )}
+                        </span>
                       </div>
                       <div className={styles.paymentBadges}>
                         <span className={payment.decision === "approved" ? styles.approved : styles.rejected}>
