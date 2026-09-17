@@ -50,3 +50,11 @@ export function formatAtomicUsdc(atomic: number) {
 export function formatAtomicUsd(atomic: number) {
   return `$${formatAtomicUsdc(atomic)}`;
 }
+
+export function formatAtomicUsdDisplay(atomic: number) {
+  const cents = atomicUsdcToExactCents(atomic);
+  if (cents !== null) {
+    return `$${(cents / 100).toFixed(2)}`;
+  }
+  return formatAtomicUsd(atomic);
+}
