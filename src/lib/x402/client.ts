@@ -6,10 +6,14 @@ import {
   x402HTTPClient,
 } from "@x402/fetch";
 import { ExactSvmScheme } from "@x402/svm/exact/client";
-import { formatAtomicUsd } from "@/lib/money/usdc";
+import {
+  atomicUsdcFromString,
+  formatAtomicUsd,
+} from "@/lib/money/usdc";
 import {
   assertX402ClientConfigured,
   SOLANA_DEVNET_NETWORK,
+  SOLANA_DEVNET_USDC_MINT,
 } from "@/lib/x402/config";
 
 export interface X402SettlementResult {
@@ -17,6 +21,79 @@ export interface X402SettlementResult {
   transactionSignature: string;
   network: string;
   payer: string | null;
+}
+
+type PaymentRequirement = {
+  scheme?: unknown;
+  network?: unknown;
+  asset?: unknown;
+  amount?: unknown;
+};
+
+type PaymentRequired = {
+  x402Version?: unknown;
+  accepts?: unknown;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function decodePaymentRequired(value: string | null): PaymentRequired | null {
+  if (!value) return null;
+
+  const attempts = [
+    () => JSON.parse(value) as unknown,
+    () => JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as unknown,
+    () => JSON.parse(Buffer.from(value, "base64").toString("utf8")) as unknown,
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const parsed = attempt();
+      if (isRecord(parsed)) return parsed as PaymentRequired;
+    } catch {
+      // Try the next supported representation.
+    }
+  }
+
+  return null;
+}
+
+function validatePaymentChallenge(
+  paymentRequiredHeader: string | null,
+  expectedAmountAtomic: number
+) {
+  const challenge = decodePaymentRequired(paymentRequiredHeader);
+  if (!challenge || challenge.x402Version !== 2 || !Array.isArray(challenge.accepts)) {
+    throw new Error("x402 resource returned an invalid PAYMENT-REQUIRED challenge");
+  }
+
+  const requirement = challenge.accepts.find(
+    (rawRequirement) =>
+      isRecord(rawRequirement) &&
+      (rawRequirement as PaymentRequirement).scheme === "exact" &&
+      (rawRequirement as PaymentRequirement).network === SOLANA_DEVNET_NETWORK &&
+      (rawRequirement as PaymentRequirement).asset === SOLANA_DEVNET_USDC_MINT &&
+      typeof (rawRequirement as PaymentRequirement).amount === "string"
+  ) as PaymentRequirement | undefined;
+
+  if (!requirement || typeof requirement.amount !== "string") {
+    throw new Error(
+      "x402 resource challenge does not offer exact USDC settlement on the authorized Solana Devnet network"
+    );
+  }
+
+  const challengedAmountAtomic = atomicUsdcFromString(requirement.amount);
+  if (challengedAmountAtomic === null) {
+    throw new Error("x402 resource challenge contains an invalid atomic USDC amount");
+  }
+
+  if (challengedAmountAtomic !== expectedAmountAtomic) {
+    throw new Error(
+      `x402 price changed after policy authorization: approved ${expectedAmountAtomic} atomic USDC, challenge requested ${challengedAmountAtomic}`
+    );
+  }
 }
 
 function extractResourceContent(rawBody: string) {
@@ -86,7 +163,20 @@ export async function purchaseX402Resource(
     new ExactSvmScheme(signer, { rpcUrl: config.rpcUrl })
   );
 
-  const fetchWithPayment = wrapFetchWithPayment(fetch, client);
+  const guardedFetch: typeof fetch = async (input, init) => {
+    const response = await fetch(input, init);
+
+    if (response.status === 402) {
+      validatePaymentChallenge(
+        response.headers.get("payment-required"),
+        maxAmountAtomic
+      );
+    }
+
+    return response;
+  };
+
+  const fetchWithPayment = wrapFetchWithPayment(guardedFetch, client);
   const response = await fetchWithPayment(url, {
     method: "GET",
     cache: "no-store",
