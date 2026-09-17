@@ -14,6 +14,7 @@ import {
   isExternalX402ExecutionEnabled,
   SOLANA_DEVNET_NETWORK,
   SOLANA_DEVNET_USDC_MINT,
+  SOLANA_MAINNET_NETWORK,
 } from "@/lib/x402/config";
 
 export type ResourceRegistryKind = "local-demo" | "external" | "hybrid";
@@ -21,6 +22,8 @@ export type ResourceRegistryMode = "local-demo" | "bazaar" | "hybrid";
 
 export interface RegistryResource extends PaidResource {
   purchaseUrl?: string;
+  settlementNetwork: string;
+  settlementAsset: string;
 }
 
 export interface ResourceRegistryInfo {
@@ -99,6 +102,16 @@ function addExampleQueryParams(resourceUrl: string, input: Record<string, unknow
   }
 }
 
+function localRegistryResource(resource: PaidResource): RegistryResource {
+  return {
+    ...resource,
+    settlementNetwork: SOLANA_DEVNET_NETWORK,
+    settlementAsset: SOLANA_DEVNET_USDC_MINT,
+  };
+}
+
+const LOCAL_DEMO_RESOURCES = DEMO_RESOURCES.map(localRegistryResource);
+
 function mapBazaarItem(item: BazaarItem): RegistryResource | null {
   const resourceUrl = stringValue(item.resource);
   if (!resourceUrl || item.type !== "http" || !Array.isArray(item.accepts)) return null;
@@ -161,6 +174,8 @@ function mapBazaarItem(item: BazaarItem): RegistryResource | null {
     description,
     content: "",
     purchaseUrl,
+    settlementNetwork: SOLANA_DEVNET_NETWORK,
+    settlementAsset: SOLANA_DEVNET_USDC_MINT,
   };
 }
 
@@ -174,11 +189,11 @@ class LocalDemoResourceRegistry implements ResourceRegistry {
   };
 
   async listResources() {
-    return DEMO_RESOURCES;
+    return LOCAL_DEMO_RESOURCES;
   }
 
   async getResourceById(id: string) {
-    return DEMO_RESOURCES.find((resource) => resource.id === id);
+    return LOCAL_DEMO_RESOURCES.find((resource) => resource.id === id);
   }
 }
 
@@ -273,6 +288,12 @@ export function getResourceRegistry(): ResourceRegistry {
   return localDemoRegistry;
 }
 
+function settlementNetworkLabel(network: string) {
+  if (network === SOLANA_DEVNET_NETWORK) return "Solana Devnet";
+  if (network === SOLANA_MAINNET_NETWORK) return "Solana Mainnet";
+  return network;
+}
+
 export function toPublicResourceMetadata(resource: RegistryResource) {
   return {
     id: resource.id,
@@ -289,7 +310,9 @@ export function toPublicResourceMetadata(resource: RegistryResource) {
     description: resource.description,
     synthetic: !resource.purchaseUrl,
     paymentProtocol: "x402",
-    settlementNetwork: "Solana Devnet",
+    settlementNetwork: settlementNetworkLabel(resource.settlementNetwork),
+    settlementNetworkId: resource.settlementNetwork,
+    settlementAsset: resource.settlementAsset,
     currency: "USDC",
     purchaseTarget: resource.purchaseUrl ? "external" : "policyrail-proxy",
   };
