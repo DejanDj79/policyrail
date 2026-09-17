@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  centsToAtomicUsdc,
+  formatAtomicUsdDisplay,
+} from "@/lib/money/usdc";
 import styles from "./live-execution.module.css";
 
 type AuditEvent = {
@@ -14,6 +18,7 @@ type ActivityPayload = {
   task?: {
     status: string;
     spent_cents: number;
+    spent_atomic: number | null;
   };
   events?: AuditEvent[];
   error?: string;
@@ -26,7 +31,34 @@ function payloadText(payload: Record<string, unknown> | null, key: string) {
 
 function payloadNumber(payload: Record<string, unknown> | null, key: string) {
   const value = payload?.[key];
-  return typeof value === "number" ? value : null;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function payloadAtomic(payload: Record<string, unknown> | null, key: string) {
+  const value = payload?.[key];
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
+    return value;
+  }
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) {
+    const parsed = Number(value);
+    if (Number.isSafeInteger(parsed) && parsed >= 0) return parsed;
+  }
+  return null;
+}
+
+function payloadMoney(
+  payload: Record<string, unknown> | null,
+  atomicKey: string,
+  centsKey: string
+) {
+  const atomic = payloadAtomic(payload, atomicKey);
+  if (atomic !== null) return formatAtomicUsdDisplay(atomic);
+
+  const cents = payloadNumber(payload, centsKey);
+  if (cents !== null && Number.isSafeInteger(cents) && cents >= 0) {
+    return formatAtomicUsdDisplay(centsToAtomicUsdc(cents));
+  }
+  return null;
 }
 
 function eventTitle(event: AuditEvent) {
@@ -62,10 +94,10 @@ function eventBody(event: AuditEvent) {
   const payload = event.payload;
 
   if (event.event_type === "task_created") {
-    const budget = payloadNumber(payload, "budget_cents");
+    const budget = payloadMoney(payload, "budget_atomic", "budget_cents");
     return budget === null
       ? "Execution entered the policy-controlled flow."
-      : `Task budget: $${(budget / 100).toFixed(2)}.`;
+      : `Task budget: ${budget}.`;
   }
 
   if (event.event_type === "resource_discovery_completed") {
@@ -76,9 +108,9 @@ function eventBody(event: AuditEvent) {
 
   if (event.event_type === "agent_resource_proposed") {
     const provider = payloadText(payload, "provider");
-    const amount = payloadNumber(payload, "amount_cents");
+    const amount = payloadMoney(payload, "amount_atomic", "amount_cents");
     const rationale = payloadText(payload, "rationale");
-    const proposal = [provider, amount === null ? null : `$${(amount / 100).toFixed(2)}`]
+    const proposal = [provider, amount]
       .filter(Boolean)
       .join(" · ");
     return `${proposal}${proposal && rationale ? " — " : ""}${rationale ?? "Agent selected its next procurement step."}`;
@@ -90,8 +122,8 @@ function eventBody(event: AuditEvent) {
 
   if (event.event_type === "payment_settled") {
     const provider = payloadText(payload, "provider");
-    const amount = payloadNumber(payload, "amount_cents");
-    return `Real x402 settlement${provider ? ` with ${provider}` : ""}${amount === null ? "" : ` for $${(amount / 100).toFixed(2)}`}.`;
+    const amount = payloadMoney(payload, "amount_atomic", "amount_cents");
+    return `Real x402 settlement${provider ? ` with ${provider}` : ""}${amount ? ` for ${amount}` : ""}.`;
   }
 
   if (event.event_type === "payment_settlement_failed") {
@@ -99,10 +131,10 @@ function eventBody(event: AuditEvent) {
   }
 
   if (event.event_type === "task_completed") {
-    const spent = payloadNumber(payload, "total_spent_cents");
+    const spent = payloadMoney(payload, "total_spent_atomic", "total_spent_cents");
     return spent === null
       ? "The agent completed the task."
-      : `Execution completed with $${(spent / 100).toFixed(2)} settled spend.`;
+      : `Execution completed with ${spent} settled spend.`;
   }
 
   return "Audit event recorded.";
@@ -138,7 +170,7 @@ export default function LiveExecution({
 }) {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [status, setStatus] = useState("running");
-  const [spentCents, setSpentCents] = useState(0);
+  const [spentAtomic, setSpentAtomic] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
 
@@ -157,9 +189,18 @@ export default function LiveExecution({
 
         if (cancelled) return;
 
+        const taskSpentAtomic = Number(payload.task.spent_atomic);
+        const fallbackSpentAtomic = Number.isSafeInteger(payload.task.spent_cents)
+          ? centsToAtomicUsdc(payload.task.spent_cents)
+          : 0;
+
         setEvents(payload.events);
         setStatus(payload.task.status);
-        setSpentCents(payload.task.spent_cents ?? 0);
+        setSpentAtomic(
+          Number.isSafeInteger(taskSpentAtomic) && taskSpentAtomic >= 0
+            ? taskSpentAtomic
+            : fallbackSpentAtomic
+        );
         setError(null);
 
         if (running || payload.task.status === "running") {
@@ -208,7 +249,7 @@ export default function LiveExecution({
         <div className={styles.statusBlock}>
           <span className={`${styles.dot} ${status === "running" ? styles.dotLive : ""}`} />
           <strong>{status.toUpperCase()}</strong>
-          <small>${(spentCents / 100).toFixed(2)} settled</small>
+          <small>{formatAtomicUsdDisplay(spentAtomic)} settled</small>
         </div>
       </div>
 
