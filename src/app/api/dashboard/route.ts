@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
+import { atomicUsdcToExactCents } from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/server";
+
+function sumAtomic(rows: Array<{ amount_atomic: number | string | null }>) {
+  return rows.reduce((total, row) => {
+    const amount = Number(row.amount_atomic ?? 0);
+    return Number.isSafeInteger(amount) && amount >= 0 ? total + amount : total;
+  }, 0);
+}
 
 export async function GET() {
   const supabase = await createClient();
@@ -33,6 +41,7 @@ export async function GET() {
     recentTasksResult,
     recentPaymentsResult,
     settledDayResult,
+    legacySettledDayResult,
     completedTasksResult,
     rejectedPaymentsResult,
     settledPaymentsResult,
@@ -40,29 +49,38 @@ export async function GET() {
     supabase
       .from("policies")
       .select(
-        "id,task_budget_cents,daily_budget_cents,max_transaction_cents,allowed_categories,blocked_providers,updated_at"
+        "id,task_budget_cents,daily_budget_cents,max_transaction_cents,task_budget_atomic,daily_budget_atomic,max_transaction_atomic,allowed_categories,blocked_providers,updated_at"
       )
       .eq("agent_id", agent.id)
       .single(),
     supabase
       .from("tasks")
-      .select("id,prompt,status,budget_cents,spent_cents,result,created_at,completed_at")
+      .select(
+        "id,prompt,status,budget_cents,budget_atomic,spent_cents,spent_atomic,result,created_at,completed_at"
+      )
       .eq("agent_id", agent.id)
       .order("created_at", { ascending: false })
       .limit(6),
     supabase
       .from("payment_requests")
       .select(
-        "id,task_id,provider,resource,category,amount_cents,decision,decision_code,reason,settlement_status,transaction_signature,created_at,settled_at"
+        "id,task_id,provider,resource,category,amount_cents,amount_atomic,decision,decision_code,reason,settlement_status,transaction_signature,created_at,settled_at"
       )
       .eq("agent_id", agent.id)
       .order("created_at", { ascending: false })
       .limit(10),
     supabase
       .from("payment_requests")
-      .select("amount_cents")
+      .select("amount_atomic")
       .eq("agent_id", agent.id)
       .eq("settlement_status", "settled")
+      .gte("settled_at", rollingDayStart),
+    supabase
+      .from("payment_requests")
+      .select("amount_atomic")
+      .eq("agent_id", agent.id)
+      .eq("settlement_status", "settled")
+      .is("settled_at", null)
       .gte("created_at", rollingDayStart),
     supabase
       .from("tasks")
@@ -86,6 +104,7 @@ export async function GET() {
     recentTasksResult.error,
     recentPaymentsResult.error,
     settledDayResult.error,
+    legacySettledDayResult.error,
     completedTasksResult.error,
     rejectedPaymentsResult.error,
     settledPaymentsResult.error,
@@ -95,16 +114,16 @@ export async function GET() {
     return NextResponse.json({ error: firstError.message }, { status: 500 });
   }
 
-  const settled24hCents = (settledDayResult.data ?? []).reduce(
-    (total, payment) => total + payment.amount_cents,
-    0
-  );
+  const settled24hAtomic =
+    sumAtomic(settledDayResult.data ?? []) +
+    sumAtomic(legacySettledDayResult.data ?? []);
 
   return NextResponse.json({
     agent,
     policy: policyResult.data,
     summary: {
-      settled24hCents,
+      settled24hAtomic,
+      settled24hCents: atomicUsdcToExactCents(settled24hAtomic),
       completedTasks: completedTasksResult.count ?? 0,
       rejectedPayments: rejectedPaymentsResult.count ?? 0,
       settledPayments: settledPaymentsResult.count ?? 0,
