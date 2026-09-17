@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import PolicySimulator from "./PolicySimulator";
 import WalletCard from "./WalletCard";
 
 type Agent = {
@@ -215,6 +216,7 @@ export default function PolicyPage() {
       <section className="settingsGrid">
         <div className="settingsMain">
           {!initializing && agent ? <WalletCard /> : null}
+          {!initializing && agent ? <PolicySimulator agentId={agent.id} /> : null}
 
           <section className="panel settingsPanel">
             <div className="panelHeader">
@@ -367,7 +369,7 @@ export default function PolicyPage() {
           <div className="policyExplanation">
             <span>Decision boundary</span>
             <p>
-              Agent intent → deterministic PolicyRail check → wallet signature → x402 / Solana settlement.
+              Agent intent → deterministic PolicyRail check → constraint envelope → autonomous adaptation → wallet signature.
             </p>
           </div>
 
