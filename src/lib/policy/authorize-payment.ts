@@ -1,18 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  atomicUsdcToExactCents,
-  formatAtomicUsdc,
-} from "@/lib/money/usdc";
-import { evaluatePayment } from "@/lib/policy/engine";
-import type { SpendingCategory, SpendingPolicy } from "@/lib/policy/types";
-
-const VALID_CATEGORIES: SpendingCategory[] = [
-  "search",
-  "data",
-  "compute",
-  "inference",
-  "other",
-];
+import type {
+  PolicyDecisionCode,
+  SpendingCategory,
+} from "@/lib/policy/types";
 
 export interface AuthorizationRequest {
   taskId: string;
@@ -28,47 +18,84 @@ export interface FinalizeSettlementRequest {
   transactionSignature?: string | null;
 }
 
-function atomicDbValue(
-  value: unknown,
-  label: string,
-  options: { allowZero?: boolean } = {}
-) {
-  const allowZero = options.allowZero ?? true;
+interface AtomicAuthorizationResult {
+  approved: boolean;
+  code: PolicyDecisionCode;
+  reason: string;
+  remainingTaskBudgetAtomic: number;
+  remainingDailyBudgetAtomic: number;
+  paymentRequestId: string;
+  agentId: string;
+  taskId: string;
+}
+
+const DECISION_CODES = new Set<PolicyDecisionCode>([
+  "APPROVED",
+  "TASK_BUDGET_EXCEEDED",
+  "DAILY_BUDGET_EXCEEDED",
+  "TRANSACTION_LIMIT_EXCEEDED",
+  "CATEGORY_NOT_ALLOWED",
+  "PROVIDER_BLOCKED",
+]);
+
+function safeAtomic(value: unknown, label: string) {
   const parsed =
     typeof value === "number"
       ? value
-      : typeof value === "string" && /^-?\d+$/.test(value.trim())
+      : typeof value === "string" && /^\d+$/.test(value.trim())
         ? Number(value)
         : Number.NaN;
 
-  if (
-    !Number.isSafeInteger(parsed) ||
-    parsed < 0 ||
-    (!allowZero && parsed === 0)
-  ) {
-    throw new Error(`Invalid ${label}`);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new Error(`Invalid ${label} returned by authorization RPC`);
   }
 
   return parsed;
 }
 
-function addAtomic(left: number, right: number, label: string) {
-  if (left > Number.MAX_SAFE_INTEGER - right) {
-    throw new Error(`${label} exceeds JavaScript safe integer range`);
+function parseAuthorizationResult(value: unknown): AtomicAuthorizationResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Invalid authorization RPC response");
   }
-  return left + right;
-}
 
-function sumPaymentAtomic(
-  payments: Array<{ amount_atomic: unknown }>,
-  label: string
-) {
-  return payments.reduce((sum, payment, index) => {
-    const amount = atomicDbValue(payment.amount_atomic, `${label}[${index}]`, {
-      allowZero: false,
-    });
-    return addAtomic(sum, amount, label);
-  }, 0);
+  const result = value as Record<string, unknown>;
+
+  if (typeof result.approved !== "boolean") {
+    throw new Error("Invalid authorization approval state");
+  }
+  if (
+    typeof result.code !== "string" ||
+    !DECISION_CODES.has(result.code as PolicyDecisionCode)
+  ) {
+    throw new Error("Invalid authorization decision code");
+  }
+  if (typeof result.reason !== "string" || !result.reason.trim()) {
+    throw new Error("Invalid authorization reason");
+  }
+  if (
+    typeof result.paymentRequestId !== "string" ||
+    typeof result.agentId !== "string" ||
+    typeof result.taskId !== "string"
+  ) {
+    throw new Error("Invalid authorization identifiers");
+  }
+
+  return {
+    approved: result.approved,
+    code: result.code as PolicyDecisionCode,
+    reason: result.reason,
+    remainingTaskBudgetAtomic: safeAtomic(
+      result.remainingTaskBudgetAtomic,
+      "remaining task budget"
+    ),
+    remainingDailyBudgetAtomic: safeAtomic(
+      result.remainingDailyBudgetAtomic,
+      "remaining daily budget"
+    ),
+    paymentRequestId: result.paymentRequestId,
+    agentId: result.agentId,
+    taskId: result.taskId,
+  };
 }
 
 export async function authorizePaymentForTask(
@@ -79,204 +106,26 @@ export async function authorizePaymentForTask(
     throw new Error("Invalid atomic USDC amount");
   }
 
-  const { data: task, error: taskError } = await supabase
-    .from("tasks")
-    .select("id,agent_id,budget_atomic,spent_atomic,status")
-    .eq("id", request.taskId)
-    .single();
+  const provider = request.provider.trim();
+  const resource = request.resource.trim();
 
-  if (taskError || !task) {
-    throw new Error("Task not found");
+  if (!provider || !resource) {
+    throw new Error("Invalid payment request");
   }
 
-  if (task.status !== "running") {
-    throw new Error("Task is not running");
-  }
-
-  const { data: storedPolicy, error: policyError } = await supabase
-    .from("policies")
-    .select(
-      "task_budget_atomic,daily_budget_atomic,max_transaction_atomic,allowed_categories,blocked_providers"
-    )
-    .eq("agent_id", task.agent_id)
-    .single();
-
-  if (policyError || !storedPolicy) {
-    throw new Error("Policy not found");
-  }
-
-  const rollingDayStart = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-  const [recentSettledResult, legacyRecentSettledResult, authorizedResult] =
-    await Promise.all([
-      supabase
-        .from("payment_requests")
-        .select("amount_atomic")
-        .eq("agent_id", task.agent_id)
-        .eq("decision", "approved")
-        .in("settlement_status", ["simulated", "settled"])
-        .gte("settled_at", rollingDayStart),
-      supabase
-        .from("payment_requests")
-        .select("amount_atomic")
-        .eq("agent_id", task.agent_id)
-        .eq("decision", "approved")
-        .in("settlement_status", ["simulated", "settled"])
-        .is("settled_at", null)
-        .gte("created_at", rollingDayStart),
-      supabase
-        .from("payment_requests")
-        .select("task_id,amount_atomic")
-        .eq("agent_id", task.agent_id)
-        .eq("decision", "approved")
-        .eq("settlement_status", "authorized"),
-    ]);
-
-  if (recentSettledResult.error) {
-    throw new Error(recentSettledResult.error.message);
-  }
-  if (legacyRecentSettledResult.error) {
-    throw new Error(legacyRecentSettledResult.error.message);
-  }
-  if (authorizedResult.error) {
-    throw new Error(authorizedResult.error.message);
-  }
-
-  const recentSettledAtomic = sumPaymentAtomic(
-    recentSettledResult.data ?? [],
-    "recent settled spend"
-  );
-  const legacyRecentSettledAtomic = sumPaymentAtomic(
-    legacyRecentSettledResult.data ?? [],
-    "legacy recent settled spend"
-  );
-  const dailyRealizedAtomic = addAtomic(
-    recentSettledAtomic,
-    legacyRecentSettledAtomic,
-    "daily realized spend"
-  );
-
-  const authorizedPayments = authorizedResult.data ?? [];
-  const dailyReservedAtomic = sumPaymentAtomic(
-    authorizedPayments,
-    "daily authorized reservations"
-  );
-  const taskReservedAtomic = sumPaymentAtomic(
-    authorizedPayments.filter((payment) => payment.task_id === task.id),
-    "task authorized reservations"
-  );
-
-  const taskBudgetAtomic = atomicDbValue(task.budget_atomic, "task budget_atomic");
-  const taskSpentAtomic = atomicDbValue(task.spent_atomic, "task spent_atomic");
-  const policyTaskBudgetAtomic = atomicDbValue(
-    storedPolicy.task_budget_atomic,
-    "policy task_budget_atomic"
-  );
-  const dailyBudgetAtomic = atomicDbValue(
-    storedPolicy.daily_budget_atomic,
-    "policy daily_budget_atomic"
-  );
-  const maxTransactionAtomic = atomicDbValue(
-    storedPolicy.max_transaction_atomic,
-    "policy max_transaction_atomic"
-  );
-
-  if (!Array.isArray(storedPolicy.allowed_categories)) {
-    throw new Error("Invalid policy allowed_categories");
-  }
-  if (!Array.isArray(storedPolicy.blocked_providers)) {
-    throw new Error("Invalid policy blocked_providers");
-  }
-
-  const effectiveTaskSpentAtomic = addAtomic(
-    taskSpentAtomic,
-    taskReservedAtomic,
-    "task committed spend"
-  );
-  const dailySpentAtomic = addAtomic(
-    dailyRealizedAtomic,
-    dailyReservedAtomic,
-    "daily committed spend"
-  );
-
-  const policy: SpendingPolicy = {
-    taskBudgetAtomic: Math.min(taskBudgetAtomic, policyTaskBudgetAtomic),
-    dailyBudgetAtomic,
-    maxTransactionAtomic,
-    allowedCategories: storedPolicy.allowed_categories.filter((category: string) =>
-      VALID_CATEGORIES.includes(category as SpendingCategory)
-    ) as SpendingCategory[],
-    blockedProviders: storedPolicy.blocked_providers.filter(
-      (provider: unknown): provider is string => typeof provider === "string"
-    ),
-  };
-
-  const decision = evaluatePayment(policy, {
-    provider: request.provider.trim(),
-    resource: request.resource.trim(),
-    category: request.category,
-    amountAtomic: request.amountAtomic,
-    taskSpentAtomic: effectiveTaskSpentAtomic,
-    dailySpentAtomic,
+  const { data, error } = await supabase.rpc("authorize_payment_atomic", {
+    p_task_id: request.taskId,
+    p_provider: provider,
+    p_resource: resource,
+    p_category: request.category,
+    p_amount_atomic: request.amountAtomic,
   });
 
-  const legacyAmountCents = atomicUsdcToExactCents(request.amountAtomic);
-
-  const { data: paymentRequest, error: paymentInsertError } = await supabase
-    .from("payment_requests")
-    .insert({
-      agent_id: task.agent_id,
-      task_id: task.id,
-      provider: request.provider.trim(),
-      resource: request.resource.trim(),
-      category: request.category,
-      amount_atomic: request.amountAtomic,
-      amount_cents: legacyAmountCents,
-      decision: decision.approved ? "approved" : "rejected",
-      decision_code: decision.code,
-      reason: decision.reason,
-      settlement_status: decision.approved ? "authorized" : "not_applicable",
-    })
-    .select("id")
-    .single();
-
-  if (paymentInsertError) {
-    throw new Error(paymentInsertError.message);
+  if (error) {
+    throw new Error(error.message);
   }
 
-  const { error: auditError } = await supabase.from("audit_events").insert({
-    agent_id: task.agent_id,
-    task_id: task.id,
-    payment_request_id: paymentRequest.id,
-    event_type: decision.approved ? "payment_approved" : "payment_rejected",
-    payload: {
-      provider: request.provider.trim(),
-      resource: request.resource.trim(),
-      category: request.category,
-      amount_atomic: request.amountAtomic,
-      amount_usdc: formatAtomicUsdc(request.amountAtomic),
-      amount_cents: legacyAmountCents,
-      decision_code: decision.code,
-      reason: decision.reason,
-      settlement_status: decision.approved ? "authorized" : "not_applicable",
-      effective_task_budget_atomic: policy.taskBudgetAtomic,
-      task_realized_atomic: taskSpentAtomic,
-      task_reserved_atomic: taskReservedAtomic,
-      daily_realized_atomic: dailyRealizedAtomic,
-      daily_reserved_atomic: dailyReservedAtomic,
-    },
-  });
-
-  if (auditError) {
-    throw new Error(auditError.message);
-  }
-
-  return {
-    ...decision,
-    paymentRequestId: paymentRequest.id,
-    agentId: task.agent_id,
-    taskId: task.id,
-  };
+  return parseAuthorizationResult(data);
 }
 
 export async function finalizePaymentSettlement(
