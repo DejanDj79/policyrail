@@ -1,9 +1,9 @@
 export type SpendingCategory = "search" | "data" | "compute" | "inference" | "other";
 
 export interface SpendingPolicy {
-  taskBudgetCents: number;
-  dailyBudgetCents: number;
-  maxTransactionCents: number;
+  taskBudgetAtomic: number;
+  dailyBudgetAtomic: number;
+  maxTransactionAtomic: number;
   allowedCategories: SpendingCategory[];
   blockedProviders: string[];
 }
@@ -12,9 +12,9 @@ export interface PaymentRequest {
   provider: string;
   resource: string;
   category: SpendingCategory;
-  amountCents: number;
-  taskSpentCents: number;
-  dailySpentCents: number;
+  amountAtomic: number;
+  taskSpentAtomic: number;
+  dailySpentAtomic: number;
 }
 
 export type PolicyDecisionCode =
@@ -29,6 +29,6 @@ export interface PolicyDecision {
   approved: boolean;
   code: PolicyDecisionCode;
   reason: string;
-  remainingTaskBudgetCents: number;
-  remainingDailyBudgetCents: number;
+  remainingTaskBudgetAtomic: number;
+  remainingDailyBudgetAtomic: number;
 }
