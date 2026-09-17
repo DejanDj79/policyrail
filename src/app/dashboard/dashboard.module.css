@@ -168,6 +168,7 @@
   display: grid;
   grid-template-columns: 0.85fr 1.15fr;
   gap: 18px;
+  align-items: start;
   margin-top: 18px;
 }
 
@@ -175,6 +176,25 @@
   min-width: 0;
   border-radius: 22px;
   padding: 24px;
+}
+
+.recentTasksPanel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.recentTasksPanel .panelHeader {
+  flex: 0 0 auto;
+}
+
+.recentTasksPanel .taskList {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-right: 6px;
 }
 
 .panelHeader {
@@ -440,6 +460,16 @@
 
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  .recentTasksPanel {
+    height: auto !important;
+    overflow: visible;
+  }
+
+  .recentTasksPanel .taskList {
+    overflow-y: visible;
+    padding-right: 0;
   }
 
   .hero {
