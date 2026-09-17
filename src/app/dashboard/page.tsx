@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   centsToAtomicUsdc,
   formatAtomicUsdDisplay,
@@ -103,6 +103,8 @@ export default function DashboardPage() {
   const [wallet, setWallet] = useState<WalletPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [recentTasksPanelHeight, setRecentTasksPanelHeight] = useState<number | null>(null);
+  const agentPanelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,6 +156,30 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [supabase]);
+
+  useEffect(() => {
+    const panel = agentPanelRef.current;
+    if (!panel || !data) return;
+
+    const syncHeight = () => {
+      if (window.matchMedia("(max-width: 900px)").matches) {
+        setRecentTasksPanelHeight(null);
+        return;
+      }
+
+      setRecentTasksPanelHeight(Math.ceil(panel.getBoundingClientRect().height));
+    };
+
+    syncHeight();
+    const observer = new ResizeObserver(syncHeight);
+    observer.observe(panel);
+    window.addEventListener("resize", syncHeight);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", syncHeight);
+    };
+  }, [data]);
 
   const dailyUsagePercent = useMemo(() => {
     const dailyBudgetAtomic = atomicOrCents(
@@ -227,7 +253,7 @@ export default function DashboardPage() {
           </section>
 
           <section className={styles.grid}>
-            <div className={styles.panel}>
+            <div className={styles.panel} ref={agentPanelRef}>
               <div className={styles.panelHeader}>
                 <div>
                   <p className={styles.label}>ACTIVE AGENT</p>
@@ -297,7 +323,10 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className={styles.panel}>
+            <div
+              className={`${styles.panel} ${styles.recentTasksPanel}`}
+              style={recentTasksPanelHeight ? { height: `${recentTasksPanelHeight}px` } : undefined}
+            >
               <div className={styles.panelHeader}>
                 <div>
                   <p className={styles.label}>RECENT TASKS</p>
