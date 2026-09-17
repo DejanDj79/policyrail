@@ -29,7 +29,7 @@ export async function GET() {
   const { data: tasks, error: tasksError } = await supabase
     .from("tasks")
     .select(
-      "id,agent_id,prompt,status,budget_cents,spent_cents,result,created_at,completed_at"
+      "id,agent_id,prompt,status,budget_cents,budget_atomic,spent_cents,spent_atomic,result,created_at,completed_at"
     )
     .in("agent_id", agentIds)
     .order("created_at", { ascending: false })
@@ -44,13 +44,14 @@ export async function GET() {
     task_id: string | null;
     decision: string;
     settlement_status: string;
-    amount_cents: number;
+    amount_cents: number | null;
+    amount_atomic: number;
   }> = [];
 
   if (taskIds.length) {
     const { data: paymentRows, error: paymentsError } = await supabase
       .from("payment_requests")
-      .select("task_id,decision,settlement_status,amount_cents")
+      .select("task_id,decision,settlement_status,amount_cents,amount_atomic")
       .in("task_id", taskIds);
 
     if (paymentsError) {
@@ -62,7 +63,7 @@ export async function GET() {
 
   const stats = new Map<
     string,
-    { approved: number; rejected: number; settled: number; settledCents: number }
+    { approved: number; rejected: number; settled: number; settledAtomic: number }
   >();
 
   for (const payment of payments) {
@@ -71,14 +72,17 @@ export async function GET() {
       approved: 0,
       rejected: 0,
       settled: 0,
-      settledCents: 0,
+      settledAtomic: 0,
     };
 
     if (payment.decision === "approved") current.approved += 1;
     if (payment.decision === "rejected") current.rejected += 1;
     if (payment.settlement_status === "settled") {
       current.settled += 1;
-      current.settledCents += payment.amount_cents;
+      const amountAtomic = Number(payment.amount_atomic ?? 0);
+      if (Number.isSafeInteger(amountAtomic) && amountAtomic >= 0) {
+        current.settledAtomic += amountAtomic;
+      }
     }
 
     stats.set(payment.task_id, current);
@@ -92,7 +96,7 @@ export async function GET() {
         approved: 0,
         rejected: 0,
         settled: 0,
-        settledCents: 0,
+        settledAtomic: 0,
       },
     })),
   });
