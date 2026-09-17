@@ -150,39 +150,14 @@ export async function markPaymentSettlementFailed(
   paymentRequestId: string,
   reason: string
 ) {
-  const { data: payment, error: readError } = await supabase
-    .from("payment_requests")
-    .select("id,agent_id,task_id,settlement_status")
-    .eq("id", paymentRequestId)
-    .single();
-
-  if (readError || !payment) {
-    throw new Error(readError?.message ?? "Payment request not found");
-  }
-
-  if (payment.settlement_status !== "authorized") {
-    return;
-  }
-
-  const { error: updateError } = await supabase
-    .from("payment_requests")
-    .update({ settlement_status: "failed" })
-    .eq("id", paymentRequestId)
-    .eq("settlement_status", "authorized");
-
-  if (updateError) {
-    throw new Error(updateError.message);
-  }
-
-  const { error: auditError } = await supabase.from("audit_events").insert({
-    agent_id: payment.agent_id,
-    task_id: payment.task_id,
-    payment_request_id: payment.id,
-    event_type: "payment_settlement_failed",
-    payload: { reason },
+  const { data, error } = await supabase.rpc("fail_payment_settlement", {
+    p_payment_request_id: paymentRequestId,
+    p_reason: reason,
   });
 
-  if (auditError) {
-    throw new Error(auditError.message);
+  if (error) {
+    throw new Error(error.message);
   }
+
+  return data;
 }
