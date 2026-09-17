@@ -45,7 +45,7 @@ Policy approval creates an `authorized` payment request. It does **not** count a
 
 When `POLICYRAIL_X402_ENABLED=true`, an approved purchase is sent to an x402-protected API route. The x402 client signs an exact USDC payment on Solana Devnet, the facilitator verifies and settles it, and PolicyRail stores the resulting transaction signature before adding the resource to the agent's evidence.
 
-The x402 client also has its own per-payment spend cap equal to the amount PolicyRail just approved. A resource cannot silently raise its price after authorization and still get signed.
+The x402 client also has its own per-payment spend cap equal to the amount PolicyRail just approved. Before signing, PolicyRail validates the live `PAYMENT-REQUIRED` challenge against the policy-authorized atomic amount, network, and asset. A resource cannot silently change price, token, or network after authorization and still get signed.
 
 When x402 is disabled, the same flow runs in `simulated` settlement mode so development can continue without a funded wallet.
 
@@ -60,9 +60,23 @@ POLICYRAIL_X402_ENABLED=true
 POLICYRAIL_EXTERNAL_X402_ENABLED=true
 ```
 
-The active Bazaar procurement adapter is additionally locked to `exact` USDC on **Solana Devnet**. Solana mainnet resources may be inspected by the read-only Bazaar preview and probe, but they cannot enter the executable procurement registry. This keeps mainnet signing disabled by construction while external execution is being introduced incrementally.
+Devnet exact-USDC resources are preferred whenever available. Solana mainnet resources require a **third independent opt-in**:
 
-`POLICYRAIL_RESOURCE_REGISTRY_MODE=hybrid` or `bazaar` controls which registry is selected; it does not by itself grant permission to spend on external endpoints.
+```env
+POLICYRAIL_MAINNET_X402_ENABLED=true
+```
+
+Mainnet execution also requires a dedicated payer wallet and a mainnet RPC configuration. PolicyRail does not automatically reuse the Devnet payer credentials:
+
+```env
+SOLANA_MAINNET_RPC_URL=https://api.mainnet-beta.solana.com
+POLICYRAIL_MAINNET_AGENT_ADDRESS=...
+POLICYRAIL_MAINNET_AGENT_PRIVATE_KEY=...
+```
+
+If the mainnet flag or dedicated payer credentials are missing, mainnet execution fails closed before any payment signature is created. Keep `POLICYRAIL_MAINNET_X402_ENABLED=false` unless you are deliberately performing a real mainnet purchase.
+
+`POLICYRAIL_RESOURCE_REGISTRY_MODE=hybrid` or `bazaar` controls which registry is selected; it does not by itself grant permission to spend on external endpoints or mainnet.
 
 ## Stack
 
@@ -126,10 +140,11 @@ After both wallets have Devnet USDC, change this line in `.env.local`:
 POLICYRAIL_X402_ENABLED=true
 ```
 
-Keep external Bazaar execution disabled unless you are deliberately testing external Devnet purchases:
+Keep external Bazaar execution and mainnet execution disabled unless you are deliberately testing them:
 
 ```env
 POLICYRAIL_EXTERNAL_X402_ENABLED=false
+POLICYRAIL_MAINNET_X402_ENABLED=false
 ```
 
 The setup script also adds these values automatically when missing:
