@@ -66,6 +66,15 @@ type PreviewPayload = {
   facilitator?: string;
   checkedAt?: string;
   sampleLimit?: number;
+  execution?: {
+    registryMode: "local-demo" | "bazaar" | "hybrid";
+    externalRegistrySelected: boolean;
+    x402Enabled: boolean;
+    externalExecutionEnabled: boolean;
+    mainnetExecutionEnabled: boolean;
+    devnetExecutableResources: number;
+    mainnetExecutableResources: number;
+  };
   counts?: {
     fetched: number;
     http: number;
@@ -117,6 +126,10 @@ function probeLabel(outcome: ProbeOutcome) {
     case "request-failed":
       return "REQUEST FAILED";
   }
+}
+
+function enabledLabel(value: boolean) {
+  return value ? "ON" : "OFF";
 }
 
 function DistributionList({
@@ -264,8 +277,35 @@ export default function BazaarPreview() {
             </div>
           </div>
 
+          {preview.execution ? (
+            <>
+              <div className={styles.mainnetStats}>
+                <div>
+                  <span>Registry mode</span>
+                  <strong>{preview.execution.registryMode}</strong>
+                </div>
+                <div>
+                  <span>x402 payments</span>
+                  <strong>{enabledLabel(preview.execution.x402Enabled)}</strong>
+                </div>
+                <div>
+                  <span>External execution</span>
+                  <strong>{enabledLabel(preview.execution.externalExecutionEnabled)}</strong>
+                </div>
+                <div>
+                  <span>Mainnet execution</span>
+                  <strong>{enabledLabel(preview.execution.mainnetExecutionEnabled)}</strong>
+                </div>
+              </div>
+              <div className={styles.filterNote}>
+                Executable under the current server configuration: Devnet {preview.execution.devnetExecutableResources} · Mainnet {preview.execution.mainnetExecutableResources}.
+                Preview and dry-run probes stay read-only regardless of these execution gates.
+              </div>
+            </>
+          ) : null}
+
           <div className={styles.filterNote}>
-            Current compatibility gate: HTTP · GET · exact · Solana Devnet · USDC · positive atomic price.
+            Current Devnet compatibility gate: HTTP · GET · exact · Solana Devnet · USDC · positive atomic price.
             Fractional-cent USDC is supported by the PolicyRail ledger.
             {preview.excluded ? (
               <span>
@@ -303,7 +343,7 @@ export default function BazaarPreview() {
                   </div>
                   <h3>How much of the live Bazaar fits PolicyRail&apos;s atomic ledger?</h3>
                   <p>
-                    Compatibility analysis only. Fractional-cent prices are now ledger-compatible; mainnet wallet signing and settlement remain disabled.
+                    Compatibility analysis only. Mainnet purchases require the dedicated execution opt-in and mainnet payer configuration; this preview never signs or settles a payment.
                   </p>
                 </div>
                 <code title={preview.solanaMainnet.network}>
@@ -427,8 +467,7 @@ export default function BazaarPreview() {
 
           {preview.counts.compatible === 0 ? (
             <div className={styles.empty}>
-              No sampled Bazaar endpoint currently passes every Devnet PolicyRail compatibility gate. Hybrid mode
-              stays disabled, while the stable local demo registry continues unchanged.
+              No sampled Bazaar endpoint currently passes every Devnet PolicyRail compatibility gate. The local demo registry remains available, and the execution-readiness status above shows whether external or mainnet procurement is enabled.
             </div>
           ) : (
             <div className={styles.resources}>
