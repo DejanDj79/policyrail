@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import {
+  centsToAtomicUsdc,
+  formatAtomicUsdDisplay,
+} from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/client";
 import AgentResult from "./AgentResult";
 import LiveExecution from "./LiveExecution";
@@ -22,7 +26,9 @@ type Policy = {
 type Attempt = {
   resourceId: string;
   resourceName: string;
-  amountCents: number;
+  amountAtomic: number;
+  amountCents: number | null;
+  amountUsdc: string;
   agentRationale: string;
   approved: boolean;
   policyReason: string;
@@ -43,7 +49,9 @@ type RunPayload = {
   taskId?: string;
   discovery?: Discovery;
   finalAnswer?: string;
-  totalSpentCents?: number;
+  totalSpentAtomic?: number;
+  totalSpentCents?: number | null;
+  totalSpentUsdc?: string;
   settlementMode?: "simulated" | "x402-solana-devnet";
   attempts?: Attempt[];
   error?: string;
@@ -56,6 +64,22 @@ const TRAVEL_DEMO_TASK =
 
 function money(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
+}
+
+function responseSpendAtomic(payload: RunPayload) {
+  if (
+    Number.isSafeInteger(payload.totalSpentAtomic) &&
+    Number(payload.totalSpentAtomic) >= 0
+  ) {
+    return Number(payload.totalSpentAtomic);
+  }
+  if (
+    Number.isSafeInteger(payload.totalSpentCents) &&
+    Number(payload.totalSpentCents) >= 0
+  ) {
+    return centsToAtomicUsdc(Number(payload.totalSpentCents));
+  }
+  return 0;
 }
 
 function shortSignature(signature: string) {
@@ -74,7 +98,7 @@ export default function NewTaskPage() {
   const [discovery, setDiscovery] = useState<Discovery | null>(null);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [finalAnswer, setFinalAnswer] = useState<string | null>(null);
-  const [spent, setSpent] = useState(0);
+  const [spentAtomic, setSpentAtomic] = useState(0);
   const [taskId, setTaskId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -146,7 +170,7 @@ export default function NewTaskPage() {
     setDiscovery(null);
     setAttempts([]);
     setFinalAnswer(null);
-    setSpent(0);
+    setSpentAtomic(0);
     setTaskId(null);
 
     try {
@@ -185,7 +209,7 @@ export default function NewTaskPage() {
 
       setDiscovery(runPayload.discovery ?? null);
       setAttempts(runPayload.attempts);
-      setSpent(runPayload.totalSpentCents ?? 0);
+      setSpentAtomic(responseSpendAtomic(runPayload));
       setFinalAnswer(runPayload.finalAnswer ?? null);
     } catch (runError) {
       setError(runError instanceof Error ? runError.message : "Task failed.");
@@ -350,7 +374,7 @@ export default function NewTaskPage() {
               <p className={styles.label}>TASK RESULT</p>
               <h2>{finalAnswer ? "Completed" : "Agent decisions"}</h2>
             </div>
-            <div className={styles.spendBadge}>{money(spent)} spent</div>
+            <div className={styles.spendBadge}>{formatAtomicUsdDisplay(spentAtomic)} spent</div>
           </div>
 
           {discovery ? (
@@ -371,7 +395,7 @@ export default function NewTaskPage() {
                 <div className={styles.timelineTop}>
                   <div>
                     <strong>{attempt.resourceName}</strong>
-                    <span>{money(attempt.amountCents)} proposed</span>
+                    <span>{formatAtomicUsdDisplay(attempt.amountAtomic)} proposed</span>
                   </div>
                   <span className={attempt.approved ? styles.approved : styles.rejected}>
                     {attempt.approved ? "APPROVED" : "REJECTED"}
