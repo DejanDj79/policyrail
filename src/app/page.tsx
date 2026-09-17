@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { formatAtomicUsdDisplay } from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/client";
 
 type Agent = {
@@ -24,7 +25,9 @@ type Policy = {
 type AgentAttempt = {
   resourceId: string;
   resourceName: string;
-  amountCents: number;
+  amountAtomic: number;
+  amountCents: number | null;
+  amountUsdc: string;
   agentRationale: string;
   approved: boolean;
   policyReason: string;
@@ -37,7 +40,9 @@ type AgentRunPayload = {
   model?: string;
   taskId?: string;
   finalAnswer?: string;
-  totalSpentCents?: number;
+  totalSpentAtomic?: number;
+  totalSpentUsdc?: string;
+  totalSpentCents?: number | null;
   settlementMode?: "simulated" | "x402-solana-devnet";
   attempts?: AgentAttempt[];
   error?: string;
@@ -54,7 +59,7 @@ export default function Home() {
   const [supabase] = useState(() => createClient());
   const [agent, setAgent] = useState<Agent | null>(null);
   const [policy, setPolicy] = useState<Policy | null>(null);
-  const [spent, setSpent] = useState(0);
+  const [spentAtomic, setSpentAtomic] = useState(0);
   const [events, setEvents] = useState<AgentAttempt[]>([]);
   const [finalAnswer, setFinalAnswer] = useState<string | null>(null);
   const [model, setModel] = useState<string | null>(null);
@@ -118,7 +123,7 @@ export default function Home() {
     if (!agent || !policy) return;
 
     setEvents([]);
-    setSpent(0);
+    setSpentAtomic(0);
     setFinalAnswer(null);
     setModel(null);
     setSettlementMode(null);
@@ -153,18 +158,18 @@ export default function Home() {
         throw new Error(agentPayload.error ?? "AI agent execution failed.");
       }
 
-      let localSpent = 0;
+      let localSpentAtomic = 0;
 
       for (const attempt of agentPayload.attempts) {
         setEvents((current) => [...current, attempt]);
         if (attempt.approved) {
-          localSpent += attempt.amountCents;
-          setSpent(localSpent);
+          localSpentAtomic += attempt.amountAtomic;
+          setSpentAtomic(localSpentAtomic);
         }
         await new Promise((resolve) => setTimeout(resolve, 650));
       }
 
-      setSpent(agentPayload.totalSpentCents ?? localSpent);
+      setSpentAtomic(agentPayload.totalSpentAtomic ?? localSpentAtomic);
       setFinalAnswer(agentPayload.finalAnswer ?? null);
       setModel(agentPayload.model ?? null);
       setSettlementMode(agentPayload.settlementMode ?? "simulated");
@@ -231,7 +236,7 @@ export default function Home() {
             </div>
             <div>
               <span>Spent</span>
-              <strong>${(spent / 100).toFixed(2)}</strong>
+              <strong>{formatAtomicUsdDisplay(spentAtomic)}</strong>
             </div>
           </div>
 
@@ -296,7 +301,7 @@ export default function Home() {
                 <div className="event" key={`${event.resourceId}-${index}`}>
                   <div>
                     <strong>{event.resourceName}</strong>
-                    <span>${(event.amountCents / 100).toFixed(2)} proposal</span>
+                    <span>{formatAtomicUsdDisplay(event.amountAtomic)} proposal</span>
                   </div>
                   <div className={event.approved ? "approved" : "rejected"}>
                     {event.approved ? "APPROVED" : "REJECTED"}
