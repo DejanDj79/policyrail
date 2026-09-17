@@ -314,7 +314,14 @@ export async function POST(request: Request) {
         if (isX402Enabled()) {
           const resourceUrl =
             resource.purchaseUrl ?? new URL(`/api/x402/${resource.id}`, request.url).toString();
-          const settlement = await purchaseX402Resource(resourceUrl, resource.amountAtomic);
+          const settlement = await purchaseX402Resource(
+            resourceUrl,
+            resource.amountAtomic,
+            {
+              network: resource.settlementNetwork,
+              asset: resource.settlementAsset,
+            }
+          );
 
           acquiredContent = settlement.content;
           settlementStatus = "settled";

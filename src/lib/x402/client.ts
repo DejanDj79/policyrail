@@ -23,6 +23,11 @@ export interface X402SettlementResult {
   payer: string | null;
 }
 
+export interface X402PurchaseExpectation {
+  network: string;
+  asset: string;
+}
+
 type PaymentRequirement = {
   scheme?: unknown;
   network?: unknown;
@@ -62,7 +67,8 @@ function decodePaymentRequired(value: string | null): PaymentRequired | null {
 
 function validatePaymentChallenge(
   paymentRequiredHeader: string | null,
-  expectedAmountAtomic: number
+  expectedAmountAtomic: number,
+  expectation: X402PurchaseExpectation
 ) {
   const challenge = decodePaymentRequired(paymentRequiredHeader);
   if (!challenge || challenge.x402Version !== 2 || !Array.isArray(challenge.accepts)) {
@@ -73,14 +79,14 @@ function validatePaymentChallenge(
     (rawRequirement) =>
       isRecord(rawRequirement) &&
       (rawRequirement as PaymentRequirement).scheme === "exact" &&
-      (rawRequirement as PaymentRequirement).network === SOLANA_DEVNET_NETWORK &&
-      (rawRequirement as PaymentRequirement).asset === SOLANA_DEVNET_USDC_MINT &&
+      (rawRequirement as PaymentRequirement).network === expectation.network &&
+      (rawRequirement as PaymentRequirement).asset === expectation.asset &&
       typeof (rawRequirement as PaymentRequirement).amount === "string"
   ) as PaymentRequirement | undefined;
 
   if (!requirement || typeof requirement.amount !== "string") {
     throw new Error(
-      "x402 resource challenge does not offer exact USDC settlement on the authorized Solana Devnet network"
+      `x402 resource challenge does not match the policy-authorized network and asset (${expectation.network}, ${expectation.asset})`
     );
   }
 
@@ -138,10 +144,23 @@ function extractError(rawBody: string) {
 
 export async function purchaseX402Resource(
   url: string,
-  maxAmountAtomic: number
+  maxAmountAtomic: number,
+  expectation: X402PurchaseExpectation = {
+    network: SOLANA_DEVNET_NETWORK,
+    asset: SOLANA_DEVNET_USDC_MINT,
+  }
 ): Promise<X402SettlementResult> {
   if (!Number.isSafeInteger(maxAmountAtomic) || maxAmountAtomic <= 0) {
     throw new Error("Invalid atomic USDC spend limit");
+  }
+
+  if (
+    expectation.network !== SOLANA_DEVNET_NETWORK ||
+    expectation.asset !== SOLANA_DEVNET_USDC_MINT
+  ) {
+    throw new Error(
+      `Current PolicyRail x402 buyer only supports exact USDC on Solana Devnet; requested ${expectation.network} / ${expectation.asset}`
+    );
   }
 
   const config = assertX402ClientConfigured();
@@ -169,7 +188,8 @@ export async function purchaseX402Resource(
     if (response.status === 402) {
       validatePaymentChallenge(
         response.headers.get("payment-required"),
-        maxAmountAtomic
+        maxAmountAtomic,
+        expectation
       );
     }
 
@@ -202,8 +222,10 @@ export async function purchaseX402Resource(
     throw new Error("x402 resource responded without a successful settlement receipt");
   }
 
-  if (settlement.network !== SOLANA_DEVNET_NETWORK) {
-    throw new Error(`Unexpected x402 settlement network: ${settlement.network}`);
+  if (settlement.network !== expectation.network) {
+    throw new Error(
+      `Unexpected x402 settlement network: ${settlement.network}; expected ${expectation.network}`
+    );
   }
 
   return {
