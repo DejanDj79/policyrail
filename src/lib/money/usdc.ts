@@ -23,7 +23,7 @@ export function centsToAtomicUsdc(cents: number) {
 export function atomicUsdcFromString(value: string) {
   try {
     const atomic = BigInt(value);
-    if (atomic <= 0n || atomic > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+    if (atomic <= BigInt(0) || atomic > BigInt(Number.MAX_SAFE_INTEGER)) return null;
     return Number(atomic);
   } catch {
     return null;
