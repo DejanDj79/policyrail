@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { centsToAtomicUsdc } from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/server";
 import { getX402Configuration } from "@/lib/x402/config";
 
@@ -6,6 +7,9 @@ const DEFAULT_POLICY = {
   task_budget_cents: 30,
   daily_budget_cents: 500,
   max_transaction_cents: 15,
+  task_budget_atomic: centsToAtomicUsdc(30),
+  daily_budget_atomic: centsToAtomicUsdc(500),
+  max_transaction_atomic: centsToAtomicUsdc(15),
   allowed_categories: ["search", "data", "compute", "inference"],
   blocked_providers: ["blocked.example"],
 };
@@ -75,7 +79,7 @@ export async function POST() {
   const { data: existingPolicy, error: policyReadError } = await supabase
     .from("policies")
     .select(
-      "id,agent_id,task_budget_cents,daily_budget_cents,max_transaction_cents,allowed_categories,blocked_providers"
+      "id,agent_id,task_budget_cents,daily_budget_cents,max_transaction_cents,task_budget_atomic,daily_budget_atomic,max_transaction_atomic,allowed_categories,blocked_providers"
     )
     .eq("agent_id", agent.id)
     .maybeSingle();
@@ -91,7 +95,7 @@ export async function POST() {
       .from("policies")
       .insert({ agent_id: agent.id, ...DEFAULT_POLICY })
       .select(
-        "id,agent_id,task_budget_cents,daily_budget_cents,max_transaction_cents,allowed_categories,blocked_providers"
+        "id,agent_id,task_budget_cents,daily_budget_cents,max_transaction_cents,task_budget_atomic,daily_budget_atomic,max_transaction_atomic,allowed_categories,blocked_providers"
       )
       .single();
 
