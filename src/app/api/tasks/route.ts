@@ -86,7 +86,6 @@ export async function POST(request: Request) {
       agent_id: agent.id,
       prompt,
       budget_cents: requestedBudgetCents,
-      budget_atomic: requestedBudgetAtomic,
       spent_cents: 0,
       spent_atomic: 0,
       status: "running",
