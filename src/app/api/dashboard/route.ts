@@ -1,11 +1,27 @@
 import { NextResponse } from "next/server";
-import { atomicUsdcToExactCents } from "@/lib/money/usdc";
+import {
+  atomicUsdcFromDbValue,
+  atomicUsdcToExactCents,
+} from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/server";
 
-function sumAtomic(rows: Array<{ amount_atomic: number | string | null }>) {
-  return rows.reduce((total, row) => {
-    const amount = Number(row.amount_atomic ?? 0);
-    return Number.isSafeInteger(amount) && amount >= 0 ? total + amount : total;
+function requireAtomic(value: unknown, label: string) {
+  const atomic = atomicUsdcFromDbValue(value);
+  if (atomic === null) throw new Error(`Invalid ${label}`);
+  return atomic;
+}
+
+function addAtomic(left: number, right: number, label: string) {
+  if (left > Number.MAX_SAFE_INTEGER - right) {
+    throw new Error(`${label} exceeds JavaScript safe integer range`);
+  }
+  return left + right;
+}
+
+function sumAtomic(rows: Array<{ amount_atomic: unknown }>) {
+  return rows.reduce((total, row, index) => {
+    const amount = requireAtomic(row.amount_atomic, `settled amount[${index}]`);
+    return addAtomic(total, amount, "settled 24h spend");
   }, 0);
 }
 
@@ -114,21 +130,59 @@ export async function GET() {
     return NextResponse.json({ error: firstError.message }, { status: 500 });
   }
 
-  const settled24hAtomic =
-    sumAtomic(settledDayResult.data ?? []) +
-    sumAtomic(legacySettledDayResult.data ?? []);
+  try {
+    const settled24hAtomic = addAtomic(
+      sumAtomic(settledDayResult.data ?? []),
+      sumAtomic(legacySettledDayResult.data ?? []),
+      "settled 24h spend"
+    );
 
-  return NextResponse.json({
-    agent,
-    policy: policyResult.data,
-    summary: {
-      settled24hAtomic,
-      settled24hCents: atomicUsdcToExactCents(settled24hAtomic),
-      completedTasks: completedTasksResult.count ?? 0,
-      rejectedPayments: rejectedPaymentsResult.count ?? 0,
-      settledPayments: settledPaymentsResult.count ?? 0,
-    },
-    recentTasks: recentTasksResult.data ?? [],
-    recentPayments: recentPaymentsResult.data ?? [],
-  });
+    const policy = policyResult.data
+      ? {
+          ...policyResult.data,
+          task_budget_atomic: requireAtomic(
+            policyResult.data.task_budget_atomic,
+            "policy task budget"
+          ),
+          daily_budget_atomic: requireAtomic(
+            policyResult.data.daily_budget_atomic,
+            "policy daily budget"
+          ),
+          max_transaction_atomic: requireAtomic(
+            policyResult.data.max_transaction_atomic,
+            "policy max transaction"
+          ),
+        }
+      : null;
+
+    const recentTasks = (recentTasksResult.data ?? []).map((task) => ({
+      ...task,
+      budget_atomic: requireAtomic(task.budget_atomic, "task budget"),
+      spent_atomic: requireAtomic(task.spent_atomic, "task spend"),
+    }));
+
+    const recentPayments = (recentPaymentsResult.data ?? []).map((payment) => ({
+      ...payment,
+      amount_atomic: requireAtomic(payment.amount_atomic, "payment amount"),
+    }));
+
+    return NextResponse.json({
+      agent,
+      policy,
+      summary: {
+        settled24hAtomic,
+        settled24hCents: atomicUsdcToExactCents(settled24hAtomic),
+        completedTasks: completedTasksResult.count ?? 0,
+        rejectedPayments: rejectedPaymentsResult.count ?? 0,
+        settledPayments: settledPaymentsResult.count ?? 0,
+      },
+      recentTasks,
+      recentPayments,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid atomic ledger data" },
+      { status: 500 }
+    );
+  }
 }
