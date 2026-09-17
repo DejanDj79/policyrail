@@ -38,6 +38,16 @@ type AuditEvent = {
   created_at: string;
 };
 
+type DecisionReceipt = {
+  id: string;
+  payment_request_id: string;
+  policy_id: string;
+  receipt_version: string;
+  receipt: Record<string, unknown>;
+  receipt_hash: string;
+  created_at: string;
+};
+
 type DetailPayload = {
   task?: {
     id: string;
@@ -55,6 +65,7 @@ type DetailPayload = {
   };
   payments?: Payment[];
   events?: AuditEvent[];
+  receipts?: DecisionReceipt[];
   error?: string;
 };
 
@@ -121,6 +132,11 @@ function payloadStringArray(payload: Record<string, unknown> | null, key: string
 
 function shortSignature(signature: string) {
   return `${signature.slice(0, 10)}…${signature.slice(-8)}`;
+}
+
+function shortHash(hash: string) {
+  if (hash.length <= 24) return hash;
+  return `${hash.slice(0, 12)}…${hash.slice(-10)}`;
 }
 
 function eventTitle(event: AuditEvent) {
@@ -222,7 +238,13 @@ export default function ActivityDetailPage() {
 
         const response = await fetch(`/api/activity/${taskId}`, { cache: "no-store" });
         const payload = (await response.json()) as DetailPayload;
-        if (!response.ok || !payload.task || !payload.payments || !payload.events) {
+        if (
+          !response.ok ||
+          !payload.task ||
+          !payload.payments ||
+          !payload.events ||
+          !payload.receipts
+        ) {
           throw new Error(payload.error ?? "Could not load task activity.");
         }
 
@@ -261,6 +283,14 @@ export default function ActivityDetailPage() {
     return map;
   }, [data]);
 
+  const receiptByPayment = useMemo(() => {
+    const map = new Map<string, DecisionReceipt>();
+    for (const receipt of data?.receipts ?? []) {
+      map.set(receipt.payment_request_id, receipt);
+    }
+    return map;
+  }, [data]);
+
   const task = data?.task;
 
   return (
@@ -282,7 +312,7 @@ export default function ActivityDetailPage() {
       {loading ? <div className={styles.loading}>Loading execution record…</div> : null}
       {error ? <p className={styles.error}>{error}</p> : null}
 
-      {task && data?.payments && data.events ? (
+      {task && data?.payments && data.events && data.receipts ? (
         <>
           <section className={styles.detailHeader}>
             <div>
@@ -317,9 +347,9 @@ export default function ActivityDetailPage() {
               <small>Settled spend</small>
             </div>
             <div className={styles.summaryCard}>
-              <span>Settled payments</span>
-              <strong>{summary.settled}</strong>
-              <small>{summary.approved} approved</small>
+              <span>Decision receipts</span>
+              <strong>{data.receipts.length}</strong>
+              <small>SHA-256 addressed</small>
             </div>
             <div className={styles.summaryCard}>
               <span>Blocked attempts</span>
@@ -344,6 +374,9 @@ export default function ActivityDetailPage() {
                   const signature = payloadText(event.payload, "transaction_signature");
                   const provider = payloadText(event.payload, "provider");
                   const network = payloadText(event.payload, "network");
+                  const receipt = event.payment_request_id
+                    ? receiptByPayment.get(event.payment_request_id)
+                    : undefined;
 
                   return (
                     <article className={`${styles.timelineItem} ${eventClass(event)}`} key={event.id}>
@@ -357,6 +390,11 @@ export default function ActivityDetailPage() {
                         {amount ? <span>{amount}</span> : null}
                         {network ? <span>{solanaNetworkLabel(network)}</span> : null}
                         {decisionCode ? <span>{decisionCode}</span> : null}
+                        {receipt && (event.event_type === "payment_approved" || event.event_type === "payment_rejected") ? (
+                          <span title={receipt.receipt_hash}>
+                            receipt {shortHash(receipt.receipt_hash)}
+                          </span>
+                        ) : null}
                       </div>
                       {signature ? (
                         <a
@@ -378,14 +416,15 @@ export default function ActivityDetailPage() {
               <section className={styles.panel}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <p className={styles.label}>PAYMENTS</p>
-                    <h2>Procurement decisions</h2>
+                    <p className={styles.label}>POLICY DECISIONS</p>
+                    <h2>Receipted procurement</h2>
                   </div>
                 </div>
 
                 <div className={styles.payments}>
                   {data.payments.map((payment) => {
                     const network = settlementNetworkByPayment.get(payment.id) ?? null;
+                    const receipt = receiptByPayment.get(payment.id);
 
                     return (
                       <article className={styles.paymentCard} key={payment.id}>
@@ -412,6 +451,12 @@ export default function ActivityDetailPage() {
                           </span>
                         </div>
                         <p className={styles.paymentReason}>{payment.reason}</p>
+                        {receipt ? (
+                          <div className={styles.paymentMeta}>
+                            Decision receipt · {receipt.receipt_version} · SHA-256{" "}
+                            <code title={receipt.receipt_hash}>{shortHash(receipt.receipt_hash)}</code>
+                          </div>
+                        ) : null}
                         {payment.transaction_signature ? (
                           <a
                             className={styles.txLink}
