@@ -12,9 +12,11 @@ import type { SpendingCategory } from "@/lib/policy/types";
 import { fetchBazaarCatalog } from "@/lib/resources/bazaar-client";
 import {
   isExternalX402ExecutionEnabled,
+  isMainnetX402ExecutionEnabled,
   SOLANA_DEVNET_NETWORK,
   SOLANA_DEVNET_USDC_MINT,
   SOLANA_MAINNET_NETWORK,
+  SOLANA_MAINNET_USDC_MINT,
 } from "@/lib/x402/config";
 
 export type ResourceRegistryKind = "local-demo" | "external" | "hybrid";
@@ -46,6 +48,12 @@ type BazaarPaymentRequirement = {
   amount?: unknown;
   asset?: unknown;
   extra?: unknown;
+};
+
+type ExecutableBazaarRequirement = {
+  network: typeof SOLANA_DEVNET_NETWORK | typeof SOLANA_MAINNET_NETWORK;
+  asset: typeof SOLANA_DEVNET_USDC_MINT | typeof SOLANA_MAINNET_USDC_MINT;
+  amount: string;
 };
 
 type BazaarItem = {
@@ -112,6 +120,44 @@ function localRegistryResource(resource: PaidResource): RegistryResource {
 
 const LOCAL_DEMO_RESOURCES = DEMO_RESOURCES.map(localRegistryResource);
 
+function executableBazaarRequirement(
+  accepts: BazaarPaymentRequirement[]
+): ExecutableBazaarRequirement | null {
+  const devnet = accepts.find(
+    (candidate) =>
+      candidate?.scheme === "exact" &&
+      candidate?.network === SOLANA_DEVNET_NETWORK &&
+      candidate?.asset === SOLANA_DEVNET_USDC_MINT &&
+      typeof candidate?.amount === "string"
+  );
+
+  if (devnet && typeof devnet.amount === "string") {
+    return {
+      network: SOLANA_DEVNET_NETWORK,
+      asset: SOLANA_DEVNET_USDC_MINT,
+      amount: devnet.amount,
+    };
+  }
+
+  if (!isMainnetX402ExecutionEnabled()) return null;
+
+  const mainnet = accepts.find(
+    (candidate) =>
+      candidate?.scheme === "exact" &&
+      candidate?.network === SOLANA_MAINNET_NETWORK &&
+      candidate?.asset === SOLANA_MAINNET_USDC_MINT &&
+      typeof candidate?.amount === "string"
+  );
+
+  if (!mainnet || typeof mainnet.amount !== "string") return null;
+
+  return {
+    network: SOLANA_MAINNET_NETWORK,
+    asset: SOLANA_MAINNET_USDC_MINT,
+    amount: mainnet.amount,
+  };
+}
+
 function mapBazaarItem(item: BazaarItem): RegistryResource | null {
   const resourceUrl = stringValue(item.resource);
   if (!resourceUrl || item.type !== "http" || !Array.isArray(item.accepts)) return null;
@@ -125,18 +171,12 @@ function mapBazaarItem(item: BazaarItem): RegistryResource | null {
 
   if (url.protocol !== "https:" && url.protocol !== "http:") return null;
 
-  // Procurement execution is deliberately locked to exact Solana Devnet USDC.
-  // Mainnet resources may be discovered by the read-only Bazaar preview, but they
-  // cannot enter the active procurement registry through this adapter.
-  const requirement = (item.accepts as BazaarPaymentRequirement[]).find(
-    (candidate) =>
-      candidate?.scheme === "exact" &&
-      candidate?.network === SOLANA_DEVNET_NETWORK &&
-      candidate?.asset === SOLANA_DEVNET_USDC_MINT &&
-      typeof candidate?.amount === "string"
+  // Devnet exact USDC is preferred whenever a resource offers it. Mainnet exact
+  // USDC is executable only behind the dedicated mainnet opt-in.
+  const requirement = executableBazaarRequirement(
+    item.accepts as BazaarPaymentRequirement[]
   );
-
-  if (!requirement || typeof requirement.amount !== "string") return null;
+  if (!requirement) return null;
 
   const amountAtomic = atomicUsdcFromString(requirement.amount);
   if (amountAtomic === null) return null;
@@ -157,7 +197,9 @@ function mapBazaarItem(item: BazaarItem): RegistryResource | null {
   const provider = url.hostname;
   const pathName = url.pathname.split("/").filter(Boolean).slice(-2).join(" / ");
   const displayName = pathName || provider;
-  const tags = ["x402", "bazaar", provider].slice(0, 5);
+  const networkTag =
+    requirement.network === SOLANA_MAINNET_NETWORK ? "mainnet" : "devnet";
+  const tags = ["x402", "bazaar", networkTag, provider].slice(0, 5);
   const purchaseUrl = addExampleQueryParams(resourceUrl, input);
 
   return {
@@ -174,8 +216,8 @@ function mapBazaarItem(item: BazaarItem): RegistryResource | null {
     description,
     content: "",
     purchaseUrl,
-    settlementNetwork: SOLANA_DEVNET_NETWORK,
-    settlementAsset: SOLANA_DEVNET_USDC_MINT,
+    settlementNetwork: requirement.network,
+    settlementAsset: requirement.asset,
   };
 }
 
@@ -209,7 +251,7 @@ class BazaarResourceRegistry implements ResourceRegistry {
   private async fetchResources() {
     // Read-only Bazaar preview/probing is always allowed. External resources only
     // enter autonomous procurement when both x402 settlement and the dedicated
-    // external-execution opt-in are enabled.
+    // external-execution opt-in are enabled. Mainnet adds a third independent gate.
     if (!isExternalX402ExecutionEnabled()) return [];
 
     const catalog = await fetchBazaarCatalog(100);
