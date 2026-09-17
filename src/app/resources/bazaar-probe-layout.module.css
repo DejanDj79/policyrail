@@ -19,13 +19,48 @@
   white-space: nowrap;
 }
 
+/* Keep the probe result list compact instead of stretching the whole page. */
 .probePanel ~ section > div:nth-child(2) {
-  max-height: 320px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  max-height: 180px;
   overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  padding-right: 4px;
   align-content: start;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+}
+
+.probePanel ~ section > div:nth-child(2) > article {
+  padding: 8px !important;
+}
+
+.probePanel ~ section > div:nth-child(2) p {
+  display: -webkit-box;
+  margin: 5px 0 !important;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+/* The mainnet candidate list is the final div in this panel. Keep it equally compact. */
+.probePanel ~ div:last-child {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  max-height: 180px;
+  overflow-y: auto;
+  align-content: start;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+}
+
+.probePanel ~ div:last-child > article {
+  padding: 8px !important;
+}
+
+.probePanel ~ div:last-child > article p {
+  display: -webkit-box;
+  margin: 5px 0 !important;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
 }
 
 @media (max-width: 800px) {
@@ -37,15 +72,25 @@
   .probeButton {
     justify-self: start;
   }
+
+  .probePanel ~ section > div:nth-child(2),
+  .probePanel ~ div:last-child {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    max-height: 210px;
+  }
+}
+
+@media (max-width: 560px) {
+  .probePanel ~ section > div:nth-child(2),
+  .probePanel ~ div:last-child {
+    grid-template-columns: minmax(0, 1fr) !important;
+    max-height: 240px;
+  }
 }
 
 @media (max-width: 420px) {
   .probeButton {
     width: 100%;
     white-space: normal;
-  }
-
-  .probePanel ~ section > div:nth-child(2) {
-    max-height: 360px;
   }
 }
