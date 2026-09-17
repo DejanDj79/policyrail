@@ -11,9 +11,12 @@ import {
   formatAtomicUsd,
 } from "@/lib/money/usdc";
 import {
-  assertX402ClientConfigured,
+  assertX402PayerConfigured,
+  isMainnetX402ExecutionEnabled,
   SOLANA_DEVNET_NETWORK,
   SOLANA_DEVNET_USDC_MINT,
+  SOLANA_MAINNET_NETWORK,
+  SOLANA_MAINNET_USDC_MINT,
 } from "@/lib/x402/config";
 
 export interface X402SettlementResult {
@@ -38,6 +41,11 @@ type PaymentRequirement = {
 type PaymentRequired = {
   x402Version?: unknown;
   accepts?: unknown;
+};
+
+type SupportedExecutionTarget = {
+  network: typeof SOLANA_DEVNET_NETWORK | typeof SOLANA_MAINNET_NETWORK;
+  asset: typeof SOLANA_DEVNET_USDC_MINT | typeof SOLANA_MAINNET_USDC_MINT;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -65,10 +73,44 @@ function decodePaymentRequired(value: string | null): PaymentRequired | null {
   return null;
 }
 
+function resolveExecutionTarget(
+  expectation: X402PurchaseExpectation
+): SupportedExecutionTarget {
+  if (
+    expectation.network === SOLANA_DEVNET_NETWORK &&
+    expectation.asset === SOLANA_DEVNET_USDC_MINT
+  ) {
+    return {
+      network: SOLANA_DEVNET_NETWORK,
+      asset: SOLANA_DEVNET_USDC_MINT,
+    };
+  }
+
+  if (
+    expectation.network === SOLANA_MAINNET_NETWORK &&
+    expectation.asset === SOLANA_MAINNET_USDC_MINT
+  ) {
+    if (!isMainnetX402ExecutionEnabled()) {
+      throw new Error(
+        "Solana mainnet x402 execution is disabled by the dedicated PolicyRail mainnet gate"
+      );
+    }
+
+    return {
+      network: SOLANA_MAINNET_NETWORK,
+      asset: SOLANA_MAINNET_USDC_MINT,
+    };
+  }
+
+  throw new Error(
+    `Unsupported x402 settlement target: ${expectation.network} / ${expectation.asset}`
+  );
+}
+
 function validatePaymentChallenge(
   paymentRequiredHeader: string | null,
   expectedAmountAtomic: number,
-  expectation: X402PurchaseExpectation
+  expectation: SupportedExecutionTarget
 ) {
   const challenge = decodePaymentRequired(paymentRequiredHeader);
   if (!challenge || challenge.x402Version !== 2 || !Array.isArray(challenge.accepts)) {
@@ -154,22 +196,16 @@ export async function purchaseX402Resource(
     throw new Error("Invalid atomic USDC spend limit");
   }
 
-  if (
-    expectation.network !== SOLANA_DEVNET_NETWORK ||
-    expectation.asset !== SOLANA_DEVNET_USDC_MINT
-  ) {
-    throw new Error(
-      `Current PolicyRail x402 buyer only supports exact USDC on Solana Devnet; requested ${expectation.network} / ${expectation.asset}`
-    );
-  }
-
-  const config = assertX402ClientConfigured();
-  const privateKeyBytes = base58.decode(config.agentPrivateKey);
+  const target = resolveExecutionTarget(expectation);
+  const payer = assertX402PayerConfigured(target.network);
+  const privateKeyBytes = base58.decode(payer.agentPrivateKey);
   const signer = await createKeyPairSignerFromBytes(privateKeyBytes);
 
-  if (config.agentAddress && signer.address !== config.agentAddress) {
+  if (payer.agentAddress && signer.address !== payer.agentAddress) {
     throw new Error(
-      "POLICYRAIL_AGENT_ADDRESS does not match POLICYRAIL_AGENT_PRIVATE_KEY. Run npm run wallet:setup to repair the local configuration."
+      target.network === SOLANA_MAINNET_NETWORK
+        ? "POLICYRAIL_MAINNET_AGENT_ADDRESS does not match POLICYRAIL_MAINNET_AGENT_PRIVATE_KEY."
+        : "POLICYRAIL_AGENT_ADDRESS does not match POLICYRAIL_AGENT_PRIVATE_KEY. Run npm run wallet:setup to repair the local configuration."
     );
   }
 
@@ -178,8 +214,8 @@ export async function purchaseX402Resource(
     maxAmountPerPayment: formatAtomicUsd(maxAmountAtomic),
   });
   client.register(
-    SOLANA_DEVNET_NETWORK,
-    new ExactSvmScheme(signer, { rpcUrl: config.rpcUrl })
+    target.network,
+    new ExactSvmScheme(signer, { rpcUrl: payer.rpcUrl })
   );
 
   const guardedFetch: typeof fetch = async (input, init) => {
@@ -189,7 +225,7 @@ export async function purchaseX402Resource(
       validatePaymentChallenge(
         response.headers.get("payment-required"),
         maxAmountAtomic,
-        expectation
+        target
       );
     }
 
@@ -222,9 +258,9 @@ export async function purchaseX402Resource(
     throw new Error("x402 resource responded without a successful settlement receipt");
   }
 
-  if (settlement.network !== expectation.network) {
+  if (settlement.network !== target.network) {
     throw new Error(
-      `Unexpected x402 settlement network: ${settlement.network}; expected ${expectation.network}`
+      `Unexpected x402 settlement network: ${settlement.network}; expected ${target.network}`
     );
   }
 
