@@ -2,6 +2,11 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { discoverResourcesForTask } from "@/lib/agent/discover-resources";
 import {
+  atomicUsdcToExactCents,
+  centsToAtomicUsdc,
+  formatAtomicUsdc,
+} from "@/lib/money/usdc";
+import {
   authorizePaymentForTask,
   finalizePaymentSettlement,
   markPaymentSettlementFailed,
@@ -32,7 +37,9 @@ interface EvidenceItem {
 interface AttemptItem {
   resourceId: string;
   resourceName: string;
-  amountCents: number;
+  amountAtomic: number;
+  amountCents: number | null;
+  amountUsdc: string;
   agentRationale: string;
   approved: boolean;
   policyReason: string;
@@ -84,7 +91,7 @@ export async function POST(request: Request) {
 
   const { data: task, error: taskError } = await supabase
     .from("tasks")
-    .select("id,agent_id,prompt,budget_cents,spent_cents,status")
+    .select("id,agent_id,prompt,budget_atomic,budget_cents,spent_atomic,status")
     .eq("id", body.taskId)
     .single();
 
@@ -96,6 +103,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Task is not running" }, { status: 409 });
   }
 
+  const taskBudgetAtomic = Number(task.budget_atomic ?? centsToAtomicUsdc(Number(task.budget_cents)));
+  if (!Number.isSafeInteger(taskBudgetAtomic) || taskBudgetAtomic <= 0) {
+    return NextResponse.json({ error: "Task has an invalid budget" }, { status: 500 });
+  }
+
   const openai = new OpenAI({ apiKey });
   const registry = getResourceRegistry();
   const catalog = await registry.listResources();
@@ -105,37 +117,28 @@ export async function POST(request: Request) {
   let finalAnswer = "";
 
   try {
-    const discovery = await discoverResourcesForTask(
-      openai,
-      task.prompt,
-      catalog,
-      MODEL
-    );
+    const discovery = await discoverResourcesForTask(openai, task.prompt, catalog, MODEL);
 
-    const { error: discoveryAuditError } = await supabase
-      .from("audit_events")
-      .insert({
-        agent_id: task.agent_id,
-        task_id: task.id,
-        event_type: "resource_discovery_completed",
-        payload: {
-          model: MODEL,
-          registry_id: registry.info.id,
-          registry_kind: registry.info.kind,
-          registry_version: registry.info.version,
-          task_supported: discovery.taskSupported,
-          resource_ids: discovery.resourceIds,
-          resource_count: discovery.resourceIds.length,
-          rationale: discovery.rationale,
-          confidence: discovery.confidence,
-          input_tokens: discovery.inputTokens,
-          output_tokens: discovery.outputTokens,
-        },
-      });
+    const { error: discoveryAuditError } = await supabase.from("audit_events").insert({
+      agent_id: task.agent_id,
+      task_id: task.id,
+      event_type: "resource_discovery_completed",
+      payload: {
+        model: MODEL,
+        registry_id: registry.info.id,
+        registry_kind: registry.info.kind,
+        registry_version: registry.info.version,
+        task_supported: discovery.taskSupported,
+        resource_ids: discovery.resourceIds,
+        resource_count: discovery.resourceIds.length,
+        rationale: discovery.rationale,
+        confidence: discovery.confidence,
+        input_tokens: discovery.inputTokens,
+        output_tokens: discovery.outputTokens,
+      },
+    });
 
-    if (discoveryAuditError) {
-      throw new Error(discoveryAuditError.message);
-    }
+    if (discoveryAuditError) throw new Error(discoveryAuditError.message);
 
     const discoveredResources = discovery.resources;
     const discoveredIds = new Set(discovery.resourceIds);
@@ -149,7 +152,6 @@ export async function POST(request: Request) {
       const availableResources = discoveredResources.filter(
         (resource) => !attemptedIds.has(resource.id)
       );
-
       const canComplete = hasEnoughEvidence(evidence) || availableResources.length === 0;
       const allowedActions =
         availableResources.length === 0
@@ -157,10 +159,10 @@ export async function POST(request: Request) {
           : canComplete
             ? ["buy", "complete"]
             : ["buy"];
-      const resourceIds = [
-        ...availableResources.map((resource) => resource.id),
-        "none",
-      ];
+      const resourceIds = [...availableResources.map((resource) => resource.id), "none"];
+      const currentSpendAtomic = attempts
+        .filter((attempt) => attempt.approved)
+        .reduce((sum, attempt) => sum + attempt.amountAtomic, 0);
 
       const response = await openai.responses.create({
         model: MODEL,
@@ -180,21 +182,23 @@ export async function POST(request: Request) {
         ].join(" "),
         input: JSON.stringify({
           task: task.prompt,
-          task_budget_cents: task.budget_cents,
+          task_budget_usdc: formatAtomicUsdc(taskBudgetAtomic),
+          task_budget_atomic: taskBudgetAtomic,
           discovery: {
             registry_id: registry.info.id,
             rationale: discovery.rationale,
             confidence: discovery.confidence,
             resource_ids: discovery.resourceIds,
           },
-          current_spend_cents: attempts
-            .filter((attempt) => attempt.approved)
-            .reduce((sum, attempt) => sum + attempt.amountCents, 0),
+          current_spend_usdc: formatAtomicUsdc(currentSpendAtomic),
+          current_spend_atomic: currentSpendAtomic,
           available_resources: availableResources.map((resource) => ({
             id: resource.id,
             name: resource.name,
             provider: resource.provider,
             category: resource.category,
+            price_usdc: formatAtomicUsdc(resource.amountAtomic),
+            price_atomic: resource.amountAtomic,
             price_cents: resource.amountCents,
             quality_score: resource.qualityScore,
             description: resource.description,
@@ -208,6 +212,7 @@ export async function POST(request: Request) {
           previous_attempts: attempts.map((attempt) => ({
             resource_id: attempt.resourceId,
             approved: attempt.approved,
+            amount_usdc: attempt.amountUsdc,
             policy_reason: attempt.policyReason,
             settlement_status: attempt.settlementStatus,
           })),
@@ -233,9 +238,7 @@ export async function POST(request: Request) {
         },
       });
 
-      if (!response.output_text) {
-        throw new Error("The AI agent returned no decision.");
-      }
+      if (!response.output_text) throw new Error("The AI agent returned no decision.");
 
       const choice = JSON.parse(response.output_text) as AgentChoice;
 
@@ -249,53 +252,50 @@ export async function POST(request: Request) {
       }
 
       const resource = await registry.getResourceById(choice.resource_id);
-
-      if (
-        !resource ||
-        !discoveredIds.has(resource.id) ||
-        attemptedIds.has(resource.id)
-      ) {
+      if (!resource || !discoveredIds.has(resource.id) || attemptedIds.has(resource.id)) {
         throw new Error("The AI agent selected an unavailable resource.");
       }
 
       attemptedIds.add(resource.id);
+      const amountCents = atomicUsdcToExactCents(resource.amountAtomic);
+      const amountUsdc = formatAtomicUsdc(resource.amountAtomic);
 
-      const { error: proposalAuditError } = await supabase
-        .from("audit_events")
-        .insert({
-          agent_id: task.agent_id,
-          task_id: task.id,
-          event_type: "agent_resource_proposed",
-          payload: {
-            model: MODEL,
-            registry_id: registry.info.id,
-            resource_id: resource.id,
-            resource_name: resource.name,
-            provider: resource.provider,
-            amount_cents: resource.amountCents,
-            rationale: choice.rationale,
-            input_tokens: response.usage?.input_tokens ?? null,
-            output_tokens: response.usage?.output_tokens ?? null,
-          },
-        });
+      const { error: proposalAuditError } = await supabase.from("audit_events").insert({
+        agent_id: task.agent_id,
+        task_id: task.id,
+        event_type: "agent_resource_proposed",
+        payload: {
+          model: MODEL,
+          registry_id: registry.info.id,
+          resource_id: resource.id,
+          resource_name: resource.name,
+          provider: resource.provider,
+          amount_atomic: resource.amountAtomic,
+          amount_usdc: amountUsdc,
+          amount_cents: amountCents,
+          rationale: choice.rationale,
+          input_tokens: response.usage?.input_tokens ?? null,
+          output_tokens: response.usage?.output_tokens ?? null,
+        },
+      });
 
-      if (proposalAuditError) {
-        throw new Error(proposalAuditError.message);
-      }
+      if (proposalAuditError) throw new Error(proposalAuditError.message);
 
       const decision = await authorizePaymentForTask(supabase, {
         taskId: task.id,
         provider: resource.provider,
         resource: resource.resource,
         category: resource.category,
-        amountCents: resource.amountCents,
+        amountAtomic: resource.amountAtomic,
       });
 
       if (!decision.approved) {
         attempts.push({
           resourceId: resource.id,
           resourceName: resource.name,
-          amountCents: resource.amountCents,
+          amountAtomic: resource.amountAtomic,
+          amountCents,
+          amountUsdc,
           agentRationale: choice.rationale,
           approved: false,
           policyReason: decision.reason,
@@ -313,12 +313,8 @@ export async function POST(request: Request) {
       try {
         if (isX402Enabled()) {
           const resourceUrl =
-            resource.purchaseUrl ??
-            new URL(`/api/x402/${resource.id}`, request.url).toString();
-          const settlement = await purchaseX402Resource(
-            resourceUrl,
-            resource.amountCents
-          );
+            resource.purchaseUrl ?? new URL(`/api/x402/${resource.id}`, request.url).toString();
+          const settlement = await purchaseX402Resource(resourceUrl, resource.amountAtomic);
 
           acquiredContent = settlement.content;
           settlementStatus = "settled";
@@ -330,30 +326,28 @@ export async function POST(request: Request) {
             transactionSignature,
           });
 
-          const { error: settlementAuditError } = await supabase
-            .from("audit_events")
-            .insert({
-              agent_id: task.agent_id,
-              task_id: task.id,
-              payment_request_id: decision.paymentRequestId,
-              event_type: "payment_settled",
-              payload: {
-                protocol: "x402",
-                scheme: "exact",
-                network: settlement.network,
-                payer: settlement.payer,
-                registry_id: registry.info.id,
-                purchase_target: resource.purchaseUrl ? "external" : "policyrail-proxy",
-                provider: resource.provider,
-                resource: resource.resource,
-                amount_cents: resource.amountCents,
-                transaction_signature: transactionSignature,
-              },
-            });
+          const { error: settlementAuditError } = await supabase.from("audit_events").insert({
+            agent_id: task.agent_id,
+            task_id: task.id,
+            payment_request_id: decision.paymentRequestId,
+            event_type: "payment_settled",
+            payload: {
+              protocol: "x402",
+              scheme: "exact",
+              network: settlement.network,
+              payer: settlement.payer,
+              registry_id: registry.info.id,
+              purchase_target: resource.purchaseUrl ? "external" : "policyrail-proxy",
+              provider: resource.provider,
+              resource: resource.resource,
+              amount_atomic: resource.amountAtomic,
+              amount_usdc: amountUsdc,
+              amount_cents: amountCents,
+              transaction_signature: transactionSignature,
+            },
+          });
 
-          if (settlementAuditError) {
-            throw new Error(settlementAuditError.message);
-          }
+          if (settlementAuditError) throw new Error(settlementAuditError.message);
         } else {
           await finalizePaymentSettlement(supabase, {
             paymentRequestId: decision.paymentRequestId,
@@ -365,12 +359,7 @@ export async function POST(request: Request) {
           settlementError instanceof Error
             ? settlementError.message
             : "Payment settlement failed";
-
-        await markPaymentSettlementFailed(
-          supabase,
-          decision.paymentRequestId,
-          settlementMessage
-        );
+        await markPaymentSettlementFailed(supabase, decision.paymentRequestId, settlementMessage);
         throw new Error(
           `Policy approved ${resource.name}, but settlement failed: ${settlementMessage}`
         );
@@ -379,7 +368,9 @@ export async function POST(request: Request) {
       attempts.push({
         resourceId: resource.id,
         resourceName: resource.name,
-        amountCents: resource.amountCents,
+        amountAtomic: resource.amountAtomic,
+        amountCents,
+        amountUsdc,
         agentRationale: choice.rationale,
         approved: true,
         policyReason: decision.reason,
@@ -410,7 +401,6 @@ export async function POST(request: Request) {
         }),
         text: { verbosity: "low" },
       });
-
       finalAnswer = synthesis.output_text.trim();
     }
 
@@ -419,9 +409,11 @@ export async function POST(request: Request) {
         "The agent could not produce a final answer from the resources authorized by policy.";
     }
 
-    const totalSpentCents = attempts
+    const totalSpentAtomic = attempts
       .filter((attempt) => attempt.approved)
-      .reduce((sum, attempt) => sum + attempt.amountCents, 0);
+      .reduce((sum, attempt) => sum + attempt.amountAtomic, 0);
+    const totalSpentCents = atomicUsdcToExactCents(totalSpentAtomic);
+    const totalSpentUsdc = formatAtomicUsdc(totalSpentAtomic);
 
     const { error: taskUpdateError } = await supabase
       .from("tasks")
@@ -432,40 +424,36 @@ export async function POST(request: Request) {
       })
       .eq("id", task.id);
 
-    if (taskUpdateError) {
-      throw new Error(taskUpdateError.message);
-    }
+    if (taskUpdateError) throw new Error(taskUpdateError.message);
 
-    const { error: completionAuditError } = await supabase
-      .from("audit_events")
-      .insert({
-        agent_id: task.agent_id,
-        task_id: task.id,
-        event_type: "task_completed",
-        payload: {
-          model: MODEL,
-          registry_id: registry.info.id,
-          registry_kind: registry.info.kind,
-          registry_version: registry.info.version,
-          result: finalAnswer,
-          total_spent_cents: totalSpentCents,
-          settlement_mode: isX402Enabled() ? "x402-solana-devnet" : "simulated",
-          discovered_resources: discovery.resourceIds,
-          approved_resources: attempts
-            .filter((attempt) => attempt.approved)
-            .map((attempt) => attempt.resourceId),
-          rejected_resources: attempts
-            .filter((attempt) => !attempt.approved)
-            .map((attempt) => attempt.resourceId),
-          transactions: attempts
-            .filter((attempt) => attempt.transactionSignature)
-            .map((attempt) => attempt.transactionSignature),
-        },
-      });
+    const { error: completionAuditError } = await supabase.from("audit_events").insert({
+      agent_id: task.agent_id,
+      task_id: task.id,
+      event_type: "task_completed",
+      payload: {
+        model: MODEL,
+        registry_id: registry.info.id,
+        registry_kind: registry.info.kind,
+        registry_version: registry.info.version,
+        result: finalAnswer,
+        total_spent_atomic: totalSpentAtomic,
+        total_spent_usdc: totalSpentUsdc,
+        total_spent_cents: totalSpentCents,
+        settlement_mode: isX402Enabled() ? "x402-solana-devnet" : "simulated",
+        discovered_resources: discovery.resourceIds,
+        approved_resources: attempts
+          .filter((attempt) => attempt.approved)
+          .map((attempt) => attempt.resourceId),
+        rejected_resources: attempts
+          .filter((attempt) => !attempt.approved)
+          .map((attempt) => attempt.resourceId),
+        transactions: attempts
+          .filter((attempt) => attempt.transactionSignature)
+          .map((attempt) => attempt.transactionSignature),
+      },
+    });
 
-    if (completionAuditError) {
-      throw new Error(completionAuditError.message);
-    }
+    if (completionAuditError) throw new Error(completionAuditError.message);
 
     return NextResponse.json({
       model: MODEL,
@@ -478,6 +466,8 @@ export async function POST(request: Request) {
         confidence: discovery.confidence,
       },
       finalAnswer,
+      totalSpentAtomic,
+      totalSpentUsdc,
       totalSpentCents,
       settlementMode: isX402Enabled() ? "x402-solana-devnet" : "simulated",
       attempts,
