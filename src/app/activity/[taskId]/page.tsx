@@ -8,6 +8,10 @@ import {
   formatAtomicUsdDisplay,
 } from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/client";
+import {
+  solanaExplorerTransactionUrl,
+  solanaNetworkLabel,
+} from "@/lib/x402/network-display";
 import styles from "../activity.module.css";
 
 type Payment = {
@@ -174,7 +178,8 @@ function eventBody(event: AuditEvent) {
   if (event.event_type === "payment_settled") {
     const provider = payloadText(payload, "provider");
     const resource = payloadText(payload, "resource");
-    return `Exact x402 settlement completed${provider ? ` with ${provider}` : ""}${resource ? ` for ${resource}` : ""}.`;
+    const network = payloadText(payload, "network");
+    return `Exact x402 settlement completed${provider ? ` with ${provider}` : ""}${resource ? ` for ${resource}` : ""}${network ? ` on ${solanaNetworkLabel(network)}` : ""}.`;
   }
   if (event.event_type === "payment_settlement_failed") {
     return payloadText(payload, "reason") ?? "The authorized payment could not be settled.";
@@ -244,6 +249,16 @@ export default function ActivityDetailPage() {
       rejected: payments.filter((payment) => payment.decision === "rejected").length,
       settled: payments.filter((payment) => payment.settlement_status === "settled").length,
     };
+  }, [data]);
+
+  const settlementNetworkByPayment = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const event of data?.events ?? []) {
+      if (event.event_type !== "payment_settled" || !event.payment_request_id) continue;
+      const network = payloadText(event.payload, "network");
+      if (network) map.set(event.payment_request_id, network);
+    }
+    return map;
   }, [data]);
 
   const task = data?.task;
@@ -328,6 +343,7 @@ export default function ActivityDetailPage() {
                   const decisionCode = payloadText(event.payload, "decision_code");
                   const signature = payloadText(event.payload, "transaction_signature");
                   const provider = payloadText(event.payload, "provider");
+                  const network = payloadText(event.payload, "network");
 
                   return (
                     <article className={`${styles.timelineItem} ${eventClass(event)}`} key={event.id}>
@@ -339,12 +355,13 @@ export default function ActivityDetailPage() {
                       <div className={styles.eventMeta}>
                         {provider ? <span>{provider}</span> : null}
                         {amount ? <span>{amount}</span> : null}
+                        {network ? <span>{solanaNetworkLabel(network)}</span> : null}
                         {decisionCode ? <span>{decisionCode}</span> : null}
                       </div>
                       {signature ? (
                         <a
                           className={styles.txLink}
-                          href={`https://explorer.solana.com/tx/${signature}?cluster=devnet`}
+                          href={solanaExplorerTransactionUrl(signature, network)}
                           target="_blank"
                           rel="noreferrer"
                         >
@@ -367,40 +384,50 @@ export default function ActivityDetailPage() {
                 </div>
 
                 <div className={styles.payments}>
-                  {data.payments.map((payment) => (
-                    <article className={styles.paymentCard} key={payment.id}>
-                      <div className={styles.paymentTop}>
-                        <div>
-                          <strong>{payment.provider}</strong>
-                          <div className={styles.paymentMeta}>{payment.resource} · {payment.category}</div>
+                  {data.payments.map((payment) => {
+                    const network = settlementNetworkByPayment.get(payment.id) ?? null;
+
+                    return (
+                      <article className={styles.paymentCard} key={payment.id}>
+                        <div className={styles.paymentTop}>
+                          <div>
+                            <strong>{payment.provider}</strong>
+                            <div className={styles.paymentMeta}>
+                              {payment.resource} · {payment.category}
+                              {network ? ` · ${solanaNetworkLabel(network)}` : ""}
+                            </div>
+                          </div>
+                          <span>
+                            {formatAtomicUsdDisplay(
+                              atomicOrCents(payment.amount_atomic, payment.amount_cents)
+                            )}
+                          </span>
                         </div>
-                        <span>
-                          {formatAtomicUsdDisplay(
-                            atomicOrCents(payment.amount_atomic, payment.amount_cents)
-                          )}
-                        </span>
-                      </div>
-                      <div className={styles.paymentBadges}>
-                        <span className={payment.decision === "approved" ? styles.approved : styles.rejected}>
-                          {payment.decision}
-                        </span>
-                        <span className={payment.settlement_status === "settled" ? styles.settled : styles.neutral}>
-                          {payment.settlement_status}
-                        </span>
-                      </div>
-                      <p className={styles.paymentReason}>{payment.reason}</p>
-                      {payment.transaction_signature ? (
-                        <a
-                          className={styles.txLink}
-                          href={`https://explorer.solana.com/tx/${payment.transaction_signature}?cluster=devnet`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {shortSignature(payment.transaction_signature)} ↗
-                        </a>
-                      ) : null}
-                    </article>
-                  ))}
+                        <div className={styles.paymentBadges}>
+                          <span className={payment.decision === "approved" ? styles.approved : styles.rejected}>
+                            {payment.decision}
+                          </span>
+                          <span className={payment.settlement_status === "settled" ? styles.settled : styles.neutral}>
+                            {payment.settlement_status}
+                          </span>
+                        </div>
+                        <p className={styles.paymentReason}>{payment.reason}</p>
+                        {payment.transaction_signature ? (
+                          <a
+                            className={styles.txLink}
+                            href={solanaExplorerTransactionUrl(
+                              payment.transaction_signature,
+                              network
+                            )}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {shortSignature(payment.transaction_signature)} ↗
+                          </a>
+                        ) : null}
+                      </article>
+                    );
+                  })}
                 </div>
               </section>
 
