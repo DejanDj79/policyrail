@@ -6,6 +6,7 @@ import {
   x402HTTPClient,
 } from "@x402/fetch";
 import { ExactSvmScheme } from "@x402/svm/exact/client";
+import { formatAtomicUsd } from "@/lib/money/usdc";
 import {
   assertX402ClientConfigured,
   SOLANA_DEVNET_NETWORK,
@@ -16,10 +17,6 @@ export interface X402SettlementResult {
   transactionSignature: string;
   network: string;
   payer: string | null;
-}
-
-function dollarsFromCents(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
 }
 
 function extractResourceContent(rawBody: string) {
@@ -64,8 +61,12 @@ function extractError(rawBody: string) {
 
 export async function purchaseX402Resource(
   url: string,
-  maxAmountCents: number
+  maxAmountAtomic: number
 ): Promise<X402SettlementResult> {
+  if (!Number.isSafeInteger(maxAmountAtomic) || maxAmountAtomic <= 0) {
+    throw new Error("Invalid atomic USDC spend limit");
+  }
+
   const config = assertX402ClientConfigured();
   const privateKeyBytes = base58.decode(config.agentPrivateKey);
   const signer = await createKeyPairSignerFromBytes(privateKeyBytes);
@@ -78,7 +79,7 @@ export async function purchaseX402Resource(
 
   const client = new x402Client();
   client.setSpendControls({
-    maxAmountPerPayment: dollarsFromCents(maxAmountCents),
+    maxAmountPerPayment: formatAtomicUsd(maxAmountAtomic),
   });
   client.register(
     SOLANA_DEVNET_NETWORK,
