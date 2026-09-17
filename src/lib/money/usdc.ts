@@ -1,6 +1,17 @@
 export const USDC_ATOMIC_PER_USDC = 1_000_000;
 export const USDC_ATOMIC_PER_CENT = 10_000;
 
+function nonNegativeSafeInteger(value: unknown) {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && /^\d+$/.test(value.trim())
+        ? Number(value)
+        : Number.NaN;
+
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
 export function assertAtomicUsdc(value: number) {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error("USDC atomic amount must be a positive safe integer.");
@@ -25,6 +36,27 @@ export function atomicUsdcFromString(value: string) {
     const atomic = BigInt(value);
     if (atomic <= BigInt(0) || atomic > BigInt(Number.MAX_SAFE_INTEGER)) return null;
     return Number(atomic);
+  } catch {
+    return null;
+  }
+}
+
+export function atomicUsdcFromDbValue(value: unknown) {
+  return nonNegativeSafeInteger(value);
+}
+
+export function atomicUsdcOrLegacyCents(
+  atomic: unknown,
+  cents: unknown
+) {
+  const canonicalAtomic = atomicUsdcFromDbValue(atomic);
+  if (canonicalAtomic !== null) return canonicalAtomic;
+
+  const legacyCents = nonNegativeSafeInteger(cents);
+  if (legacyCents === null) return null;
+
+  try {
+    return centsToAtomicUsdc(legacyCents);
   } catch {
     return null;
   }
