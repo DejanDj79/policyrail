@@ -3,7 +3,9 @@ import {
   USDC_ATOMIC_PER_CENT,
   USDC_ATOMIC_PER_USDC,
   assertAtomicUsdc,
+  atomicUsdcFromDbValue,
   atomicUsdcFromString,
+  atomicUsdcOrLegacyCents,
   atomicUsdcToExactCents,
   centsToAtomicUsdc,
   formatAtomicUsd,
@@ -32,6 +34,19 @@ assert.equal(atomicUsdcFromString("0"), null);
 assert.equal(atomicUsdcFromString("-1"), null);
 assert.equal(atomicUsdcFromString("1.5"), null);
 assert.equal(atomicUsdcFromString("not-a-number"), null);
+
+assert.equal(atomicUsdcFromDbValue(0), 0);
+assert.equal(atomicUsdcFromDbValue("0"), 0);
+assert.equal(atomicUsdcFromDbValue("5000"), 5_000);
+assert.equal(atomicUsdcFromDbValue(10_000), 10_000);
+assert.equal(atomicUsdcFromDbValue("1.5"), null);
+assert.equal(atomicUsdcFromDbValue(-1), null);
+assert.equal(atomicUsdcFromDbValue(null), null);
+
+assert.equal(atomicUsdcOrLegacyCents("5000", null), 5_000);
+assert.equal(atomicUsdcOrLegacyCents(null, 1), 10_000);
+assert.equal(atomicUsdcOrLegacyCents(undefined, "30"), 300_000);
+assert.equal(atomicUsdcOrLegacyCents(null, null), null);
 
 assert.equal(atomicUsdcToExactCents(0), 0);
 assert.equal(atomicUsdcToExactCents(10_000), 1);
