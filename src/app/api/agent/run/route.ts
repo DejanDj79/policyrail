@@ -13,6 +13,7 @@ import {
 } from "@/lib/policy/authorize-payment";
 import { getResourceRegistry } from "@/lib/resources/registry";
 import { createClient } from "@/lib/supabase/server";
+import { settlementModeForNetworks } from "@/lib/x402/settlement-mode";
 import { isX402Enabled } from "@/lib/x402/config";
 import { purchaseX402Resource } from "@/lib/x402/client";
 
@@ -45,6 +46,8 @@ interface AttemptItem {
   policyReason: string;
   decisionCode: string;
   settlementStatus: "not_applicable" | "simulated" | "settled";
+  settlementNetwork: string;
+  settlementAsset: string;
   transactionSignature: string | null;
 }
 
@@ -273,6 +276,8 @@ export async function POST(request: Request) {
           amount_atomic: resource.amountAtomic,
           amount_usdc: amountUsdc,
           amount_cents: amountCents,
+          settlement_network: resource.settlementNetwork,
+          settlement_asset: resource.settlementAsset,
           rationale: choice.rationale,
           input_tokens: response.usage?.input_tokens ?? null,
           output_tokens: response.usage?.output_tokens ?? null,
@@ -301,6 +306,8 @@ export async function POST(request: Request) {
           policyReason: decision.reason,
           decisionCode: decision.code,
           settlementStatus: "not_applicable",
+          settlementNetwork: resource.settlementNetwork,
+          settlementAsset: resource.settlementAsset,
           transactionSignature: null,
         });
         continue;
@@ -342,6 +349,7 @@ export async function POST(request: Request) {
               protocol: "x402",
               scheme: "exact",
               network: settlement.network,
+              asset: resource.settlementAsset,
               payer: settlement.payer,
               registry_id: registry.info.id,
               purchase_target: resource.purchaseUrl ? "external" : "policyrail-proxy",
@@ -383,6 +391,8 @@ export async function POST(request: Request) {
         policyReason: decision.reason,
         decisionCode: decision.code,
         settlementStatus,
+        settlementNetwork: resource.settlementNetwork,
+        settlementAsset: resource.settlementAsset,
         transactionSignature,
       });
 
@@ -421,6 +431,14 @@ export async function POST(request: Request) {
       .reduce((sum, attempt) => sum + attempt.amountAtomic, 0);
     const totalSpentCents = atomicUsdcToExactCents(totalSpentAtomic);
     const totalSpentUsdc = formatAtomicUsdc(totalSpentAtomic);
+    const settlementNetworks = [
+      ...new Set(
+        attempts
+          .filter((attempt) => attempt.settlementStatus === "settled")
+          .map((attempt) => attempt.settlementNetwork)
+      ),
+    ];
+    const settlementMode = settlementModeForNetworks(isX402Enabled(), settlementNetworks);
 
     const { error: taskUpdateError } = await supabase
       .from("tasks")
@@ -446,7 +464,8 @@ export async function POST(request: Request) {
         total_spent_atomic: totalSpentAtomic,
         total_spent_usdc: totalSpentUsdc,
         total_spent_cents: totalSpentCents,
-        settlement_mode: isX402Enabled() ? "x402-solana-devnet" : "simulated",
+        settlement_mode: settlementMode,
+        settlement_networks: settlementNetworks,
         discovered_resources: discovery.resourceIds,
         approved_resources: attempts
           .filter((attempt) => attempt.approved)
@@ -476,7 +495,8 @@ export async function POST(request: Request) {
       totalSpentAtomic,
       totalSpentUsdc,
       totalSpentCents,
-      settlementMode: isX402Enabled() ? "x402-solana-devnet" : "simulated",
+      settlementMode,
+      settlementNetworks,
       attempts,
     });
   } catch (error) {
