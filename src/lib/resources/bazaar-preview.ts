@@ -1,5 +1,10 @@
 import { fetchBazaarCatalog } from "@/lib/resources/bazaar-client";
 import {
+  atomicUsdcFromString,
+  atomicUsdcToExactCents,
+  formatAtomicUsdc,
+} from "@/lib/money/usdc";
+import {
   SOLANA_DEVNET_NETWORK,
   SOLANA_DEVNET_USDC_MINT,
   SOLANA_MAINNET_NETWORK,
@@ -7,8 +12,6 @@ import {
 } from "@/lib/x402/config";
 
 const SAMPLE_LIMIT = 100;
-const ATOMIC_USDC_PER_CENT = BigInt(10_000);
-const ATOMIC_USDC_PER_USDC = BigInt(1_000_000);
 const DISTRIBUTION_LIMIT = 8;
 const MAINNET_RESOURCE_LIMIT = 12;
 
@@ -30,7 +33,9 @@ export interface BazaarPreviewResource {
   resource: string;
   provider: string;
   method: "GET";
-  amountCents: number;
+  amountAtomic: number;
+  amountCents: number | null;
+  priceUsdc: string;
   description: string;
 }
 
@@ -39,6 +44,7 @@ export interface BazaarMainnetPreviewResource {
   requestUrl: string;
   provider: string;
   method: "GET";
+  amountAtomic: number | null;
   priceUsdc: string;
   ledgerCompatible: boolean;
   description: string;
@@ -60,7 +66,7 @@ export interface BazaarPreviewResult {
     scheme: "exact";
     network: typeof SOLANA_DEVNET_NETWORK;
     asset: typeof SOLANA_DEVNET_USDC_MINT;
-    pricing: "whole-cent USDC only";
+    pricing: "positive atomic USDC";
   };
   counts: {
     fetched: number;
@@ -73,7 +79,7 @@ export interface BazaarPreviewResult {
     invalidOrNonHttp: number;
     noExactDevnetUsdc: number;
     unsupportedMethod: number;
-    subCentOrInvalidPrice: number;
+    invalidAtomicPrice: number;
   };
   breakdown: {
     paymentOptions: number;
@@ -87,8 +93,8 @@ export interface BazaarPreviewResult {
     asset: typeof SOLANA_MAINNET_USDC_MINT;
     exactUsdcResources: number;
     getResources: number;
-    wholeCentResources: number;
-    fractionalCentResources: number;
+    atomicLedgerResources: number;
+    invalidAtomicPriceResources: number;
     resources: BazaarMainnetPreviewResource[];
   };
   resources: BazaarPreviewResource[];
@@ -111,38 +117,6 @@ function nestedRecord(value: unknown, ...keys: string[]) {
   }
 
   return isRecord(current) ? current : null;
-}
-
-function wholeCentsFromAtomicUsdc(amount: string) {
-  try {
-    const atomic = BigInt(amount);
-    if (atomic <= BigInt(0) || atomic % ATOMIC_USDC_PER_CENT !== BigInt(0)) {
-      return null;
-    }
-
-    const cents = atomic / ATOMIC_USDC_PER_CENT;
-    if (cents > BigInt(Number.MAX_SAFE_INTEGER)) return null;
-    return Number(cents);
-  } catch {
-    return null;
-  }
-}
-
-function formatAtomicUsdc(amount: string) {
-  try {
-    const atomic = BigInt(amount);
-    if (atomic < BigInt(0)) return amount;
-
-    const whole = atomic / ATOMIC_USDC_PER_USDC;
-    const fraction = (atomic % ATOMIC_USDC_PER_USDC)
-      .toString()
-      .padStart(6, "0")
-      .replace(/0+$/, "");
-
-    return fraction ? `${whole.toString()}.${fraction}` : whole.toString();
-  } catch {
-    return amount;
-  }
 }
 
 function descriptionFor(item: BazaarItem, url: URL) {
@@ -208,8 +182,8 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
   let paymentOptions = 0;
   let mainnetExactUsdcResources = 0;
   let mainnetGetResources = 0;
-  let mainnetWholeCentResources = 0;
-  let mainnetFractionalCentResources = 0;
+  let mainnetAtomicLedgerResources = 0;
+  let mainnetInvalidAtomicPriceResources = 0;
   const networkCounts = new Map<string, number>();
   const schemeCounts = new Map<string, number>();
   const assetCounts = new Map<string, number>();
@@ -217,7 +191,7 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
     invalidOrNonHttp: 0,
     noExactDevnetUsdc: 0,
     unsupportedMethod: 0,
-    subCentOrInvalidPrice: 0,
+    invalidAtomicPrice: 0,
   };
   const compatible: BazaarPreviewResource[] = [];
   const mainnetResources: BazaarMainnetPreviewResource[] = [];
@@ -276,18 +250,22 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
 
       if (method === "GET") {
         mainnetGetResources += 1;
-        const amountCents = wholeCentsFromAtomicUsdc(mainnetRequirement.amount);
-        const ledgerCompatible = amountCents !== null;
+        const amountAtomic = atomicUsdcFromString(mainnetRequirement.amount);
+        const ledgerCompatible = amountAtomic !== null;
 
-        if (ledgerCompatible) mainnetWholeCentResources += 1;
-        else mainnetFractionalCentResources += 1;
+        if (ledgerCompatible) mainnetAtomicLedgerResources += 1;
+        else mainnetInvalidAtomicPriceResources += 1;
 
         mainnetResources.push({
           resource,
           requestUrl: requestUrlFor(resource, item),
           provider: url.hostname,
           method: "GET",
-          priceUsdc: formatAtomicUsdc(mainnetRequirement.amount),
+          amountAtomic,
+          priceUsdc:
+            amountAtomic === null
+              ? mainnetRequirement.amount
+              : formatAtomicUsdc(amountAtomic),
           ledgerCompatible,
           description: descriptionFor(item, url),
         });
@@ -314,9 +292,9 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
       continue;
     }
 
-    const amountCents = wholeCentsFromAtomicUsdc(requirement.amount);
-    if (amountCents === null) {
-      excluded.subCentOrInvalidPrice += 1;
+    const amountAtomic = atomicUsdcFromString(requirement.amount);
+    if (amountAtomic === null) {
+      excluded.invalidAtomicPrice += 1;
       continue;
     }
 
@@ -324,7 +302,9 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
       resource,
       provider: url.hostname,
       method: "GET",
-      amountCents,
+      amountAtomic,
+      amountCents: atomicUsdcToExactCents(amountAtomic),
+      priceUsdc: formatAtomicUsdc(amountAtomic),
       description: descriptionFor(item, url),
     });
   }
@@ -344,7 +324,7 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
       scheme: "exact",
       network: SOLANA_DEVNET_NETWORK,
       asset: SOLANA_DEVNET_USDC_MINT,
-      pricing: "whole-cent USDC only",
+      pricing: "positive atomic USDC",
     },
     counts: {
       fetched: items.length,
@@ -366,8 +346,8 @@ export async function getBazaarPreview(): Promise<BazaarPreviewResult> {
       asset: SOLANA_MAINNET_USDC_MINT,
       exactUsdcResources: mainnetExactUsdcResources,
       getResources: mainnetGetResources,
-      wholeCentResources: mainnetWholeCentResources,
-      fractionalCentResources: mainnetFractionalCentResources,
+      atomicLedgerResources: mainnetAtomicLedgerResources,
+      invalidAtomicPriceResources: mainnetInvalidAtomicPriceResources,
       resources: sortedMainnetResources.slice(0, MAINNET_RESOURCE_LIMIT),
     },
     resources: compatible.slice(0, 12),

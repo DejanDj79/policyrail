@@ -8,7 +8,9 @@ type PreviewResource = {
   resource: string;
   provider: string;
   method: "GET";
-  amountCents: number;
+  amountAtomic: number;
+  amountCents: number | null;
+  priceUsdc: string;
   description: string;
 };
 
@@ -17,6 +19,7 @@ type MainnetPreviewResource = {
   requestUrl: string;
   provider: string;
   method: "GET";
+  amountAtomic: number | null;
   priceUsdc: string;
   ledgerCompatible: boolean;
   description: string;
@@ -74,7 +77,7 @@ type PreviewPayload = {
     invalidOrNonHttp: number;
     noExactDevnetUsdc: number;
     unsupportedMethod: number;
-    subCentOrInvalidPrice: number;
+    invalidAtomicPrice: number;
   };
   breakdown?: {
     paymentOptions: number;
@@ -88,17 +91,13 @@ type PreviewPayload = {
     asset: string;
     exactUsdcResources: number;
     getResources: number;
-    wholeCentResources: number;
-    fractionalCentResources: number;
+    atomicLedgerResources: number;
+    invalidAtomicPriceResources: number;
     resources: MainnetPreviewResource[];
   };
   resources?: PreviewResource[];
   error?: string;
 };
-
-function money(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 function compactIdentifier(value: string) {
   if (value === "(missing)" || value.length <= 34) return value;
@@ -266,10 +265,11 @@ export default function BazaarPreview() {
           </div>
 
           <div className={styles.filterNote}>
-            Current compatibility gate: HTTP · GET · exact · Solana Devnet · USDC · whole-cent price.
+            Current compatibility gate: HTTP · GET · exact · Solana Devnet · USDC · positive atomic price.
+            Fractional-cent USDC is supported by the PolicyRail ledger.
             {preview.excluded ? (
               <span>
-                Payment mismatch: {preview.excluded.noExactDevnetUsdc} · matched-payment non-GET: {preview.excluded.unsupportedMethod} · sub-cent/invalid price: {preview.excluded.subCentOrInvalidPrice}.
+                Payment mismatch: {preview.excluded.noExactDevnetUsdc} · matched-payment non-GET: {preview.excluded.unsupportedMethod} · invalid atomic price: {preview.excluded.invalidAtomicPrice}.
               </span>
             ) : null}
           </div>
@@ -301,9 +301,9 @@ export default function BazaarPreview() {
                     <span>SOLANA MAINNET FIT</span>
                     <strong>READ ONLY</strong>
                   </div>
-                  <h3>How much of the live Bazaar could PolicyRail understand on mainnet?</h3>
+                  <h3>How much of the live Bazaar fits PolicyRail&apos;s atomic ledger?</h3>
                   <p>
-                    This is compatibility analysis only. No wallet, payment authorization or settlement is used.
+                    Compatibility analysis only. Fractional-cent prices are now ledger-compatible; mainnet wallet signing and settlement remain disabled.
                   </p>
                 </div>
                 <code title={preview.solanaMainnet.network}>
@@ -321,19 +321,19 @@ export default function BazaarPreview() {
                   <strong>{preview.solanaMainnet.getResources}</strong>
                 </div>
                 <div>
-                  <span>Current cent ledger</span>
-                  <strong>{preview.solanaMainnet.wholeCentResources}</strong>
+                  <span>Atomic ledger ready</span>
+                  <strong>{preview.solanaMainnet.atomicLedgerResources}</strong>
                 </div>
                 <div>
-                  <span>Atomic ledger needed</span>
-                  <strong>{preview.solanaMainnet.fractionalCentResources}</strong>
+                  <span>Invalid atomic price</span>
+                  <strong>{preview.solanaMainnet.invalidAtomicPriceResources}</strong>
                 </div>
               </div>
 
               <div className={`${styles.probePanel} ${probeLayout.probePanel}`}>
                 <div>
                   <span>LIVE x402 HANDSHAKE CHECK</span>
-                  <strong>Probe the cent-ledger candidates without paying.</strong>
+                  <strong>Probe the atomic-ledger candidates without paying.</strong>
                   <p>
                     Sends plain GET requests only. No PAYMENT-SIGNATURE header, wallet signing or settlement is performed.
                   </p>
@@ -342,7 +342,7 @@ export default function BazaarPreview() {
                   type="button"
                   className={`${styles.probeButton} ${probeLayout.probeButton}`}
                   onClick={runDryRunProbe}
-                  disabled={probeLoading || preview.solanaMainnet.wholeCentResources === 0}
+                  disabled={probeLoading || preview.solanaMainnet.atomicLedgerResources === 0}
                 >
                   {probeLoading ? "Running probes…" : "Run dry-run probes"}
                 </button>
@@ -411,7 +411,7 @@ export default function BazaarPreview() {
                       <div className={styles.mainnetResourceFooter}>
                         <code>{resource.resource}</code>
                         <span className={resource.ledgerCompatible ? styles.ledgerReady : styles.atomicNeeded}>
-                          {resource.ledgerCompatible ? "CENT LEDGER OK" : "ATOMIC LEDGER NEEDED"}
+                          {resource.ledgerCompatible ? "ATOMIC LEDGER OK" : "INVALID ATOMIC PRICE"}
                         </span>
                       </div>
                     </article>
@@ -427,7 +427,7 @@ export default function BazaarPreview() {
 
           {preview.counts.compatible === 0 ? (
             <div className={styles.empty}>
-              No sampled Bazaar endpoint currently passes every PolicyRail compatibility gate. Hybrid mode
+              No sampled Bazaar endpoint currently passes every Devnet PolicyRail compatibility gate. Hybrid mode
               stays disabled, while the stable local demo registry continues unchanged.
             </div>
           ) : (
@@ -436,7 +436,7 @@ export default function BazaarPreview() {
                 <article key={`${resource.provider}-${resource.resource}`}>
                   <div>
                     <span>{resource.provider}</span>
-                    <strong>{resource.method} · {money(resource.amountCents)}</strong>
+                    <strong>{resource.method} · {resource.priceUsdc} USDC</strong>
                   </div>
                   <p>{resource.description}</p>
                   <code>{resource.resource}</code>
