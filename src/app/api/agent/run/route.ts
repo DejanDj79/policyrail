@@ -10,6 +10,7 @@ import {
   authorizePaymentForTask,
   finalizePaymentSettlement,
   markPaymentSettlementFailed,
+  type PolicyConstraintEnvelope,
 } from "@/lib/policy/authorize-payment";
 import { getResourceRegistry } from "@/lib/resources/registry";
 import { createClient } from "@/lib/supabase/server";
@@ -45,6 +46,7 @@ interface AttemptItem {
   approved: boolean;
   policyReason: string;
   decisionCode: string;
+  policyEnvelope: PolicyConstraintEnvelope;
   settlementStatus: "not_applicable" | "simulated" | "settled";
   settlementNetwork: string;
   settlementAsset: string;
@@ -176,7 +178,9 @@ export async function POST(request: Request) {
           "Choose the next paid resource that most improves the task result.",
           "PolicyRail, not you, authorizes spending. Never claim a payment is approved before PolicyRail evaluates it.",
           "For an initial proposal, prioritize evidence quality while remaining inside the overall task budget.",
-          "If a previous proposal was rejected, explicitly adapt to the rejection reason and prefer a viable alternative.",
+          "PolicyRail returns a machine-readable constraint_envelope after every proposal. Treat it as authoritative financial policy, not as a suggestion.",
+          "If a proposal is rejected and retryAllowed is true, explicitly adapt to requiredChange and choose a different available resource that satisfies maxCompliantAmountAtomic, allowedCategories, and blockedProviders.",
+          "If retryAllowed is false, do not keep proposing purchases that violate the same envelope.",
           "For comparison tasks, gather complementary market/search evidence and benchmark/data evidence before completing when those resource types are available.",
           "Use only the resources discovered for this task. Do not invent providers or prices.",
           "When completing, set resource_id to none and put the final task answer in final_answer.",
@@ -216,7 +220,9 @@ export async function POST(request: Request) {
             resource_id: attempt.resourceId,
             approved: attempt.approved,
             amount_usdc: attempt.amountUsdc,
+            decision_code: attempt.decisionCode,
             policy_reason: attempt.policyReason,
+            constraint_envelope: attempt.policyEnvelope,
             settlement_status: attempt.settlementStatus,
           })),
         }),
@@ -305,6 +311,7 @@ export async function POST(request: Request) {
           approved: false,
           policyReason: decision.reason,
           decisionCode: decision.code,
+          policyEnvelope: decision.policyEnvelope,
           settlementStatus: "not_applicable",
           settlementNetwork: resource.settlementNetwork,
           settlementAsset: resource.settlementAsset,
@@ -390,6 +397,7 @@ export async function POST(request: Request) {
         approved: true,
         policyReason: decision.reason,
         decisionCode: decision.code,
+        policyEnvelope: decision.policyEnvelope,
         settlementStatus,
         settlementNetwork: resource.settlementNetwork,
         settlementAsset: resource.settlementAsset,
