@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { centsToAtomicUsdc } from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/server";
 import type { SpendingCategory } from "@/lib/policy/types";
 
@@ -66,19 +67,27 @@ export async function PATCH(request: Request) {
     );
   }
 
-  if ((body.maxTransactionCents ?? 0) > (body.taskBudgetCents ?? 0)) {
+  const taskBudgetCents = Number(body.taskBudgetCents);
+  const dailyBudgetCents = Number(body.dailyBudgetCents);
+  const maxTransactionCents = Number(body.maxTransactionCents);
+
+  if (maxTransactionCents > taskBudgetCents) {
     return NextResponse.json(
       { error: "Max transaction cannot exceed the task budget." },
       { status: 400 }
     );
   }
 
-  if ((body.taskBudgetCents ?? 0) > (body.dailyBudgetCents ?? 0)) {
+  if (taskBudgetCents > dailyBudgetCents) {
     return NextResponse.json(
       { error: "Task budget cannot exceed the daily budget." },
       { status: 400 }
     );
   }
+
+  const taskBudgetAtomic = centsToAtomicUsdc(taskBudgetCents);
+  const dailyBudgetAtomic = centsToAtomicUsdc(dailyBudgetCents);
+  const maxTransactionAtomic = centsToAtomicUsdc(maxTransactionCents);
 
   const allowedCategories = Array.from(
     new Set((body.allowedCategories ?? []).filter((category) =>
@@ -109,7 +118,7 @@ export async function PATCH(request: Request) {
   const { data: previousPolicy, error: previousPolicyError } = await supabase
     .from("policies")
     .select(
-      "id,agent_id,task_budget_cents,daily_budget_cents,max_transaction_cents,allowed_categories,blocked_providers"
+      "id,agent_id,task_budget_cents,daily_budget_cents,max_transaction_cents,task_budget_atomic,daily_budget_atomic,max_transaction_atomic,allowed_categories,blocked_providers"
     )
     .eq("agent_id", agent.id)
     .single();
@@ -121,15 +130,18 @@ export async function PATCH(request: Request) {
   const { data: policy, error: updateError } = await supabase
     .from("policies")
     .update({
-      task_budget_cents: body.taskBudgetCents,
-      daily_budget_cents: body.dailyBudgetCents,
-      max_transaction_cents: body.maxTransactionCents,
+      task_budget_cents: taskBudgetCents,
+      daily_budget_cents: dailyBudgetCents,
+      max_transaction_cents: maxTransactionCents,
+      task_budget_atomic: taskBudgetAtomic,
+      daily_budget_atomic: dailyBudgetAtomic,
+      max_transaction_atomic: maxTransactionAtomic,
       allowed_categories: allowedCategories,
       blocked_providers: blockedProviders,
     })
     .eq("id", previousPolicy.id)
     .select(
-      "id,agent_id,task_budget_cents,daily_budget_cents,max_transaction_cents,allowed_categories,blocked_providers"
+      "id,agent_id,task_budget_cents,daily_budget_cents,max_transaction_cents,task_budget_atomic,daily_budget_atomic,max_transaction_atomic,allowed_categories,blocked_providers"
     )
     .single();
 
@@ -148,6 +160,9 @@ export async function PATCH(request: Request) {
         task_budget_cents: previousPolicy.task_budget_cents,
         daily_budget_cents: previousPolicy.daily_budget_cents,
         max_transaction_cents: previousPolicy.max_transaction_cents,
+        task_budget_atomic: previousPolicy.task_budget_atomic,
+        daily_budget_atomic: previousPolicy.daily_budget_atomic,
+        max_transaction_atomic: previousPolicy.max_transaction_atomic,
         allowed_categories: previousPolicy.allowed_categories,
         blocked_providers: previousPolicy.blocked_providers,
       },
@@ -155,6 +170,9 @@ export async function PATCH(request: Request) {
         task_budget_cents: policy.task_budget_cents,
         daily_budget_cents: policy.daily_budget_cents,
         max_transaction_cents: policy.max_transaction_cents,
+        task_budget_atomic: policy.task_budget_atomic,
+        daily_budget_atomic: policy.daily_budget_atomic,
+        max_transaction_atomic: policy.max_transaction_atomic,
         allowed_categories: policy.allowed_categories,
         blocked_providers: policy.blocked_providers,
       },
