@@ -28,6 +28,49 @@ export interface FinalizeSettlementRequest {
   transactionSignature?: string | null;
 }
 
+function atomicDbValue(
+  value: unknown,
+  label: string,
+  options: { allowZero?: boolean } = {}
+) {
+  const allowZero = options.allowZero ?? true;
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && /^-?\d+$/.test(value.trim())
+        ? Number(value)
+        : Number.NaN;
+
+  if (
+    !Number.isSafeInteger(parsed) ||
+    parsed < 0 ||
+    (!allowZero && parsed === 0)
+  ) {
+    throw new Error(`Invalid ${label}`);
+  }
+
+  return parsed;
+}
+
+function addAtomic(left: number, right: number, label: string) {
+  if (left > Number.MAX_SAFE_INTEGER - right) {
+    throw new Error(`${label} exceeds JavaScript safe integer range`);
+  }
+  return left + right;
+}
+
+function sumPaymentAtomic(
+  payments: Array<{ amount_atomic: unknown }>,
+  label: string
+) {
+  return payments.reduce((sum, payment, index) => {
+    const amount = atomicDbValue(payment.amount_atomic, `${label}[${index}]`, {
+      allowZero: false,
+    });
+    return addAtomic(sum, amount, label);
+  }, 0);
+}
+
 export async function authorizePaymentForTask(
   supabase: SupabaseClient,
   request: AuthorizationRequest
@@ -63,34 +106,109 @@ export async function authorizePaymentForTask(
   }
 
   const rollingDayStart = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { data: approvedPayments, error: spendError } = await supabase
-    .from("payment_requests")
-    .select("amount_atomic")
-    .eq("agent_id", task.agent_id)
-    .eq("decision", "approved")
-    .in("settlement_status", ["simulated", "settled"])
-    .gte("created_at", rollingDayStart);
 
-  if (spendError) {
-    throw new Error(spendError.message);
+  const [recentSettledResult, legacyRecentSettledResult, authorizedResult] =
+    await Promise.all([
+      supabase
+        .from("payment_requests")
+        .select("amount_atomic")
+        .eq("agent_id", task.agent_id)
+        .eq("decision", "approved")
+        .in("settlement_status", ["simulated", "settled"])
+        .gte("settled_at", rollingDayStart),
+      supabase
+        .from("payment_requests")
+        .select("amount_atomic")
+        .eq("agent_id", task.agent_id)
+        .eq("decision", "approved")
+        .in("settlement_status", ["simulated", "settled"])
+        .is("settled_at", null)
+        .gte("created_at", rollingDayStart),
+      supabase
+        .from("payment_requests")
+        .select("task_id,amount_atomic")
+        .eq("agent_id", task.agent_id)
+        .eq("decision", "approved")
+        .eq("settlement_status", "authorized"),
+    ]);
+
+  if (recentSettledResult.error) {
+    throw new Error(recentSettledResult.error.message);
+  }
+  if (legacyRecentSettledResult.error) {
+    throw new Error(legacyRecentSettledResult.error.message);
+  }
+  if (authorizedResult.error) {
+    throw new Error(authorizedResult.error.message);
   }
 
-  const dailySpentAtomic = (approvedPayments ?? []).reduce(
-    (sum, payment) => sum + Number(payment.amount_atomic),
-    0
+  const recentSettledAtomic = sumPaymentAtomic(
+    recentSettledResult.data ?? [],
+    "recent settled spend"
+  );
+  const legacyRecentSettledAtomic = sumPaymentAtomic(
+    legacyRecentSettledResult.data ?? [],
+    "legacy recent settled spend"
+  );
+  const dailyRealizedAtomic = addAtomic(
+    recentSettledAtomic,
+    legacyRecentSettledAtomic,
+    "daily realized spend"
+  );
+
+  const authorizedPayments = authorizedResult.data ?? [];
+  const dailyReservedAtomic = sumPaymentAtomic(
+    authorizedPayments,
+    "daily authorized reservations"
+  );
+  const taskReservedAtomic = sumPaymentAtomic(
+    authorizedPayments.filter((payment) => payment.task_id === task.id),
+    "task authorized reservations"
+  );
+
+  const taskBudgetAtomic = atomicDbValue(task.budget_atomic, "task budget_atomic");
+  const taskSpentAtomic = atomicDbValue(task.spent_atomic, "task spent_atomic");
+  const policyTaskBudgetAtomic = atomicDbValue(
+    storedPolicy.task_budget_atomic,
+    "policy task_budget_atomic"
+  );
+  const dailyBudgetAtomic = atomicDbValue(
+    storedPolicy.daily_budget_atomic,
+    "policy daily_budget_atomic"
+  );
+  const maxTransactionAtomic = atomicDbValue(
+    storedPolicy.max_transaction_atomic,
+    "policy max_transaction_atomic"
+  );
+
+  if (!Array.isArray(storedPolicy.allowed_categories)) {
+    throw new Error("Invalid policy allowed_categories");
+  }
+  if (!Array.isArray(storedPolicy.blocked_providers)) {
+    throw new Error("Invalid policy blocked_providers");
+  }
+
+  const effectiveTaskSpentAtomic = addAtomic(
+    taskSpentAtomic,
+    taskReservedAtomic,
+    "task committed spend"
+  );
+  const dailySpentAtomic = addAtomic(
+    dailyRealizedAtomic,
+    dailyReservedAtomic,
+    "daily committed spend"
   );
 
   const policy: SpendingPolicy = {
-    taskBudgetAtomic: Math.min(
-      Number(task.budget_atomic),
-      Number(storedPolicy.task_budget_atomic)
-    ),
-    dailyBudgetAtomic: Number(storedPolicy.daily_budget_atomic),
-    maxTransactionAtomic: Number(storedPolicy.max_transaction_atomic),
+    taskBudgetAtomic: Math.min(taskBudgetAtomic, policyTaskBudgetAtomic),
+    dailyBudgetAtomic,
+    maxTransactionAtomic,
     allowedCategories: storedPolicy.allowed_categories.filter((category: string) =>
       VALID_CATEGORIES.includes(category as SpendingCategory)
     ) as SpendingCategory[],
-    blockedProviders: storedPolicy.blocked_providers,
+    blockedProviders: storedPolicy.blocked_providers.filter(
+      (provider: unknown): provider is string => typeof provider === "string"
+    ),
   };
 
   const decision = evaluatePayment(policy, {
@@ -98,7 +216,7 @@ export async function authorizePaymentForTask(
     resource: request.resource.trim(),
     category: request.category,
     amountAtomic: request.amountAtomic,
-    taskSpentAtomic: Number(task.spent_atomic),
+    taskSpentAtomic: effectiveTaskSpentAtomic,
     dailySpentAtomic,
   });
 
@@ -142,6 +260,10 @@ export async function authorizePaymentForTask(
       reason: decision.reason,
       settlement_status: decision.approved ? "authorized" : "not_applicable",
       effective_task_budget_atomic: policy.taskBudgetAtomic,
+      task_realized_atomic: taskSpentAtomic,
+      task_reserved_atomic: taskReservedAtomic,
+      daily_realized_atomic: dailyRealizedAtomic,
+      daily_reserved_atomic: dailyReservedAtomic,
     },
   });
 
