@@ -141,8 +141,10 @@ export default function ResourcesPage() {
     const list = resourceListRef.current;
     if (!list || loading || filtered.length === 0) return;
 
+    const scroller = list;
+
     function onWheel(event: globalThis.WheelEvent) {
-      const maxScrollLeft = list.scrollWidth - list.clientWidth;
+      const maxScrollLeft = scroller.scrollWidth - scroller.clientWidth;
       if (maxScrollLeft <= 1) return;
 
       const rawDelta =
@@ -157,28 +159,28 @@ export default function ResourcesPage() {
       if (event.deltaMode === 1) {
         delta = Math.sign(rawDelta) * 120;
       } else if (event.deltaMode === 2) {
-        delta = Math.sign(rawDelta) * Math.max(240, list.clientWidth * 0.75);
+        delta = Math.sign(rawDelta) * Math.max(240, scroller.clientWidth * 0.75);
       } else if (Math.abs(rawDelta) < 24) {
         delta = rawDelta * 3;
       }
 
       const movingRight = delta > 0;
-      const atStart = list.scrollLeft <= 1;
-      const atEnd = list.scrollLeft >= maxScrollLeft - 1;
+      const atStart = scroller.scrollLeft <= 1;
+      const atEnd = scroller.scrollLeft >= maxScrollLeft - 1;
 
       if ((movingRight && atEnd) || (!movingRight && atStart)) return;
 
       event.preventDefault();
-      list.scrollLeft = Math.max(
+      scroller.scrollLeft = Math.max(
         0,
-        Math.min(maxScrollLeft, list.scrollLeft + delta)
+        Math.min(maxScrollLeft, scroller.scrollLeft + delta)
       );
     }
 
-    list.addEventListener("wheel", onWheel, { passive: false });
+    scroller.addEventListener("wheel", onWheel, { passive: false });
 
     return () => {
-      list.removeEventListener("wheel", onWheel);
+      scroller.removeEventListener("wheel", onWheel);
     };
   }, [loading, filtered.length]);
 
