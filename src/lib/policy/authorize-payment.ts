@@ -43,9 +43,14 @@ export interface PolicyConstraintEnvelope {
   remainingDailyBudgetAtomic: number;
   maxCompliantAmountAtomic: number;
   allowedCategories: SpendingCategory[];
+  policyAllowedCategories?: SpendingCategory[];
+  taskAllowedCategories?: SpendingCategory[];
   blockedProviders: string[];
   providerAllowed: boolean;
+  policyCategoryAllowed?: boolean;
+  taskCategoryAllowed?: boolean;
   categoryAllowed: boolean;
+  taskMandateFrozen?: boolean;
   retryAllowed: boolean;
   requiredChange: PolicyRequiredChange | null;
 }
@@ -77,6 +82,7 @@ const DECISION_CODES = new Set<PolicyDecisionCode>([
   "DAILY_BUDGET_EXCEEDED",
   "TRANSACTION_LIMIT_EXCEEDED",
   "CATEGORY_NOT_ALLOWED",
+  "TASK_CATEGORY_NOT_ALLOWED",
   "PROVIDER_BLOCKED",
 ]);
 
@@ -193,9 +199,29 @@ export function parsePolicyEnvelope(value: unknown): PolicyConstraintEnvelope {
       "max compliant amount"
     ),
     allowedCategories: categoryArray(envelope.allowedCategories),
+    policyAllowedCategories:
+      envelope.policyAllowedCategories === undefined
+        ? undefined
+        : categoryArray(envelope.policyAllowedCategories),
+    taskAllowedCategories:
+      envelope.taskAllowedCategories === undefined
+        ? undefined
+        : categoryArray(envelope.taskAllowedCategories),
     blockedProviders: stringArray(envelope.blockedProviders, "blocked providers"),
     providerAllowed: envelope.providerAllowed,
+    policyCategoryAllowed:
+      typeof envelope.policyCategoryAllowed === "boolean"
+        ? envelope.policyCategoryAllowed
+        : undefined,
+    taskCategoryAllowed:
+      typeof envelope.taskCategoryAllowed === "boolean"
+        ? envelope.taskCategoryAllowed
+        : undefined,
     categoryAllowed: envelope.categoryAllowed,
+    taskMandateFrozen:
+      typeof envelope.taskMandateFrozen === "boolean"
+        ? envelope.taskMandateFrozen
+        : undefined,
     retryAllowed: envelope.retryAllowed,
     requiredChange: parseRequiredChange(envelope.requiredChange),
   };
