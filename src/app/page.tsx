@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import AppNav from "@/components/AppNav";
 import { useEffect, useState } from "react";
 import { formatAtomicUsdDisplay } from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/client";
@@ -243,17 +243,7 @@ export default function Home() {
 
   return (
     <main className="shell">
-      <nav>
-        <Link className="brand brandLink" href="/dashboard">
-          <span className="mark">P</span>
-          PolicyRail
-        </Link>
-        <div className="navLinks">
-          <Link href="/dashboard">Dashboard</Link>
-          <Link className="navActive" href="/">Agent run</Link>
-          <Link href="/policy">Agent policy</Link>
-        </div>
-      </nav>
+      <AppNav />
 
       <section className="hero">
         <p className="eyebrow">FINANCIAL CONTROL FOR AUTONOMOUS AGENTS</p>
