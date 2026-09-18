@@ -380,11 +380,7 @@ button:disabled {
 }
 
 .settingsHero {
-  display: grid;
-  grid-template-columns: 1fr 280px;
-  gap: 48px;
-  align-items: end;
-  padding: 84px 0 44px;
+  padding: 64px 0 44px;
 }
 
 .settingsTitle {
@@ -397,23 +393,32 @@ button:disabled {
   font-size: 18px;
 }
 
+.policySidebar {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  position: sticky;
+  top: 20px;
+}
+
 .policyState {
+  width: 100%;
   border: 1px solid var(--border);
   border-radius: 18px;
   background: rgba(17, 20, 28, 0.76);
-  padding: 20px;
+  padding: 16px 18px;
 }
 
 .policyState strong {
   display: block;
-  margin-top: 18px;
-  font-size: 20px;
+  margin-top: 12px;
+  font-size: 18px;
 }
 
 .policyState p {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -585,8 +590,6 @@ textarea:focus {
 }
 
 .policySummary {
-  position: sticky;
-  top: 20px;
   min-height: 0;
 }
 
@@ -651,8 +654,7 @@ textarea:focus {
 
 @media (max-width: 820px) {
   .grid,
-  .settingsGrid,
-  .settingsHero {
+  .settingsGrid {
     grid-template-columns: 1fr;
   }
 
@@ -661,8 +663,7 @@ textarea:focus {
   }
 
   .settingsHero {
-    padding-top: 60px;
-    gap: 20px;
+    padding-top: 48px;
   }
 
   .metrics,
@@ -697,7 +698,7 @@ textarea:focus {
     display: none;
   }
 
-  .policySummary {
+  .policySidebar {
     position: static;
   }
 }
