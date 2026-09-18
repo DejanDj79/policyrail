@@ -59,6 +59,7 @@ type DetailPayload = {
     budget_atomic: number | null;
     spent_cents: number;
     spent_atomic: number | null;
+    mandate_allowed_categories: string[];
     result: string | null;
     created_at: string;
     completed_at: string | null;
@@ -98,6 +99,13 @@ function payloadText(payload: Record<string, unknown> | null, key: string) {
 function payloadNumber(payload: Record<string, unknown> | null, key: string) {
   const value = payload?.[key];
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function payloadRecord(payload: Record<string, unknown> | null, key: string) {
+  const value = payload?.[key];
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
 }
 
 function payloadAtomic(payload: Record<string, unknown> | null, key: string) {
@@ -151,7 +159,7 @@ function eventTitle(event: AuditEvent) {
     case "payment_approved":
       return "PolicyRail approved payment";
     case "payment_rejected":
-      return "PolicyRail blocked payment";
+      return "Constraint envelope returned to agent";
     case "payment_settled":
       return "x402 payment settled";
     case "payment_settlement_failed":
@@ -167,14 +175,22 @@ function eventBody(event: AuditEvent) {
   const payload = event.payload;
   if (event.event_type === "task_created") {
     const budgetAtomic = payloadAtomic(payload, "budget_atomic");
-    if (budgetAtomic !== null) {
-      return `Task budget set to ${formatAtomicUsdDisplay(budgetAtomic)}.`;
+    const budgetCents = payloadNumber(payload, "budget_cents");
+    const mandate = payloadStringArray(payload, "mandate_allowed_categories");
+    const budgetLabel =
+      budgetAtomic !== null
+        ? formatAtomicUsdDisplay(budgetAtomic)
+        : budgetCents !== null
+          ? formatAtomicUsdDisplay(centsToAtomicUsdc(budgetCents))
+          : null;
+
+    if (!budgetLabel) {
+      return "The autonomous task entered the policy-controlled execution flow.";
     }
 
-    const budgetCents = payloadNumber(payload, "budget_cents");
-    return budgetCents === null
-      ? "The autonomous task entered the policy-controlled execution flow."
-      : `Task budget set to ${formatAtomicUsdDisplay(centsToAtomicUsdc(budgetCents))}.`;
+    return `Task budget set to ${budgetLabel}.${
+      mandate.length ? ` Frozen spending mandate: ${mandate.join(", ")}.` : ""
+    }`;
   }
   if (event.event_type === "resource_discovery_completed") {
     const resources = payloadStringArray(payload, "resource_ids");
@@ -188,8 +204,26 @@ function eventBody(event: AuditEvent) {
   if (event.event_type === "agent_resource_proposed") {
     return payloadText(payload, "rationale") ?? "The AI selected this resource as its next procurement step.";
   }
-  if (event.event_type === "payment_approved" || event.event_type === "payment_rejected") {
-    return payloadText(payload, "reason") ?? "PolicyRail evaluated the proposed payment.";
+  if (event.event_type === "payment_rejected") {
+    const reason = payloadText(payload, "reason") ?? "PolicyRail rejected the proposed payment.";
+    const envelope = payloadRecord(payload, "policy_envelope");
+    const change = payloadRecord(envelope, "requiredChange");
+    const maxCompliant = payloadAtomic(envelope, "maxCompliantAmountAtomic");
+    const allowed = payloadStringArray(envelope, "allowedCategories");
+
+    let correction = "";
+    if (change?.field === "amountAtomic" && maxCompliant !== null) {
+      correction = ` Retry at or below ${formatAtomicUsdDisplay(maxCompliant)}.`;
+    } else if (change?.field === "category" && allowed.length > 0) {
+      correction = ` Retry inside the frozen scope: ${allowed.join(", ")}.`;
+    } else if (change?.field === "provider") {
+      correction = " Retry with another provider.";
+    }
+
+    return `${reason} Constraint envelope returned to the agent.${correction}`;
+  }
+  if (event.event_type === "payment_approved") {
+    return payloadText(payload, "reason") ?? "PolicyRail approved the proposed payment.";
   }
   if (event.event_type === "payment_settled") {
     const provider = payloadText(payload, "provider");
@@ -321,6 +355,7 @@ export default function ActivityDetailPage() {
               <div className={styles.detailMeta}>
                 <span>{task.agent_name}</span>
                 <span>{dateLabel(task.created_at)}</span>
+                <span>Mandate: {task.mandate_allowed_categories.join(" · ")}</span>
                 <span className={styles.status}>{task.status}</span>
               </div>
             </div>
