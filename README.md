@@ -6,6 +6,19 @@ PolicyRail sits between an AI agent's intent and payment execution. It lets an a
 
 Built for **Crypto World's Fair 2026** with Solana as the settlement layer.
 
+## What makes PolicyRail different
+
+Many agent-payment stacks can enforce a spending cap or allowlist. PolicyRail focuses on what happens **after** a deterministic policy decision, so autonomy can continue without handing policy authority to the AI.
+
+- **Machine-readable policy negotiation** — a rejected proposal returns a structured constraint envelope with the decision code, maximum compliant amount, remaining budgets, allowed categories, blocked providers, and the exact change required for a retry.
+- **Autonomous adaptation** — the procurement agent receives that envelope on its next reasoning step and can choose a compliant alternative without a human approving every small purchase.
+- **Purpose-bound task mandates** — every task can freeze a narrower spending scope than the agent's global policy. Discovery and authorization both enforce that scope, and the agent cannot expand it after execution starts.
+- **Policy decision receipts** — every approved or rejected payment decision produces a canonical `policyrail-decision-v1` receipt with a SHA-256 hash, tying the economic intent to the policy snapshot and constraint state that produced the decision.
+- **Read-only policy simulation** — hypothetical purchases can be evaluated against the live saved policy without creating a payment request, audit event, receipt, reservation, or spend.
+
+The core loop is:
+
+`AI intent → deterministic policy decision → constraint envelope → autonomous adaptation → x402 settlement → decision receipt`
 ## MVP
 
 The end-to-end demo shows:
@@ -15,9 +28,10 @@ The end-to-end demo shows:
 3. Let the agent evaluate paid resources and propose purchases.
 4. Evaluate every proposal against deterministic spending policies.
 5. Approve or reject the purchase.
-6. Feed rejection reasons back to the AI agent so it can choose an alternative.
-7. Settle approved resources through x402 using USDC on Solana Devnet.
-8. Persist AI intent, policy decisions, settlement state, and Solana transaction signatures in the audit trail.
+6. Return a structured policy constraint envelope to the AI agent when a proposal is rejected.
+7. Let the agent adapt autonomously inside the frozen task mandate.
+8. Settle approved resources through x402 using USDC on Solana Devnet.
+9. Persist AI intent, policy decisions, constraint envelopes, decision receipts, settlement state, and Solana transaction signatures in the audit trail.
 
 ## Current milestone
 
