@@ -228,7 +228,6 @@
   margin-top: 12px;
   overflow-x: auto;
   padding: 0 0 8px;
-  scroll-snap-type: x proximity;
   scrollbar-gutter: stable;
 }
 
@@ -260,7 +259,6 @@
   background: #10141d;
   display: flex;
   flex-direction: column;
-  scroll-snap-align: start;
 }
 
 .cardTop {
