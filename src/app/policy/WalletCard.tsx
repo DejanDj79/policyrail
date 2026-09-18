@@ -105,7 +105,7 @@ export default function WalletCard() {
 
           <div className={styles.footer}>
             <p className={styles.note}>
-              Live chain balance. PolicyRail does not invent an allowance here: the policy limits how much this wallet may spend, while approved x402 payments settle from the real Devnet wallet.
+              Live wallet balance. Policy limits how much the agent may spend.
             </p>
             <button
               className={styles.refresh}
