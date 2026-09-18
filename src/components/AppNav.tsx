@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import styles from "./AppNav.module.css";
 
@@ -22,7 +23,14 @@ export default function AppNav({ active }: { active?: AppNavSection }) {
   return (
     <nav className={styles.nav}>
       <Link className={styles.brand} href="/dashboard">
-        <span className={styles.mark}>P</span>
+        <Image
+          className={styles.logo}
+          src="/pr-logo.png"
+          alt=""
+          width={34}
+          height={34}
+          priority
+        />
         PolicyRail
       </Link>
 
