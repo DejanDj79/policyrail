@@ -96,7 +96,7 @@ export async function POST(request: Request) {
 
   const { data: task, error: taskError } = await supabase
     .from("tasks")
-    .select("id,agent_id,prompt,budget_atomic,budget_cents,spent_atomic,status")
+    .select("id,agent_id,prompt,budget_atomic,budget_cents,spent_atomic,mandate_allowed_categories,status")
     .eq("id", body.taskId)
     .single();
 
@@ -113,9 +113,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Task has an invalid budget" }, { status: 500 });
   }
 
+  const taskMandateAllowedCategories = Array.isArray(task.mandate_allowed_categories)
+    ? task.mandate_allowed_categories.filter((category): category is string => typeof category === "string")
+    : [];
+
+  if (taskMandateAllowedCategories.length === 0) {
+    return NextResponse.json({ error: "Task mandate has no allowed spending categories" }, { status: 500 });
+  }
+
   const openai = new OpenAI({ apiKey });
   const registry = getResourceRegistry();
-  const catalog = await registry.listResources();
+  const catalog = (await registry.listResources()).filter((resource) =>
+    taskMandateAllowedCategories.includes(resource.category)
+  );
   const attemptedIds = new Set<string>();
   const evidence: EvidenceItem[] = [];
   const attempts: AttemptItem[] = [];
@@ -134,6 +144,7 @@ export async function POST(request: Request) {
         registry_kind: registry.info.kind,
         registry_version: registry.info.version,
         task_supported: discovery.taskSupported,
+        task_mandate_allowed_categories: taskMandateAllowedCategories,
         resource_ids: discovery.resourceIds,
         resource_count: discovery.resourceIds.length,
         rationale: discovery.rationale,
@@ -191,6 +202,7 @@ export async function POST(request: Request) {
           task: task.prompt,
           task_budget_usdc: formatAtomicUsdc(taskBudgetAtomic),
           task_budget_atomic: taskBudgetAtomic,
+          task_mandate_allowed_categories: taskMandateAllowedCategories,
           discovery: {
             registry_id: registry.info.id,
             rationale: discovery.rationale,
