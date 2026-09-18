@@ -25,7 +25,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const { data: task, error: taskError } = await supabase
     .from("tasks")
     .select(
-      "id,agent_id,prompt,status,budget_cents,budget_atomic,spent_cents,spent_atomic,result,created_at,completed_at"
+      "id,agent_id,prompt,status,budget_cents,budget_atomic,spent_cents,spent_atomic,mandate_allowed_categories,result,created_at,completed_at"
     )
     .eq("id", taskId)
     .maybeSingle();
