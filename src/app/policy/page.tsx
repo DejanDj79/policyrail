@@ -186,12 +186,16 @@ export default function PolicyPage() {
       <AppNav active="policy" />
 
       <section className="settingsHero">
-        <p className="eyebrow">AGENT POLICY</p>
-        <h1 className="settingsTitle">Define the economic boundary agents can negotiate within.</h1>
-        <p className="lede settingsLede">
-          These rules are enforced deterministically outside the AI. A rejected purchase returns a
-          machine-readable constraint envelope, so the agent can adapt without gaining authority to change the policy.
-        </p>
+        <div className="settingsHeroCopy">
+          <p className="eyebrow">AGENT POLICY</p>
+          <h1 className="settingsTitle">Define the economic boundary agents can negotiate within.</h1>
+          <p className="lede settingsLede">
+            These rules are enforced deterministically outside the AI. A rejected purchase returns a
+            machine-readable constraint envelope, so the agent can adapt without gaining authority to change the policy.
+          </p>
+        </div>
+
+        <WalletCard />
       </section>
 
       {error ? <p className="errorMessage settingsMessage">{error}</p> : null}
@@ -335,8 +339,6 @@ export default function PolicyPage() {
             <strong>{agent?.name ?? "ResearchBot"}</strong>
             <p>Changes take effect on the next procurement decision.</p>
           </div>
-
-          {!initializing && agent ? <WalletCard /> : null}
 
           <section className="policySummary panel">
             <p className="label">CURRENT POLICY</p>
