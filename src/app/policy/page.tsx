@@ -199,7 +199,6 @@ export default function PolicyPage() {
 
       <section className="settingsGrid">
         <div className="settingsMain">
-          {!initializing && agent ? <WalletCard /> : null}
           {!initializing && agent ? (
             <PolicySimulator agentId={agent.id} policyDirty={dirty} />
           ) : null}
@@ -337,38 +336,40 @@ export default function PolicyPage() {
             <p>Changes take effect on the next procurement decision.</p>
           </div>
 
+          {!initializing && agent ? <WalletCard /> : null}
+
           <section className="policySummary panel">
             <p className="label">CURRENT POLICY</p>
             <h2>Enforcement preview</h2>
             <div className="summaryRows">
-            <div>
-              <span>Task budget</span>
-              <strong>${form?.taskBudget || "0.00"}</strong>
+              <div>
+                <span>Task budget</span>
+                <strong>${form?.taskBudget || "0.00"}</strong>
+              </div>
+              <div>
+                <span>Max transaction</span>
+                <strong>${form?.maxTransaction || "0.00"}</strong>
+              </div>
+              <div>
+                <span>24h limit</span>
+                <strong>${form?.dailyBudget || "0.00"}</strong>
+              </div>
+              <div>
+                <span>Allowed categories</span>
+                <strong>{form?.allowedCategories.length ?? 0}</strong>
+              </div>
             </div>
-            <div>
-              <span>Max transaction</span>
-              <strong>${form?.maxTransaction || "0.00"}</strong>
-            </div>
-            <div>
-              <span>24h limit</span>
-              <strong>${form?.dailyBudget || "0.00"}</strong>
-            </div>
-            <div>
-              <span>Allowed categories</span>
-              <strong>{form?.allowedCategories.length ?? 0}</strong>
-            </div>
-          </div>
 
             <div className="policyExplanation">
-            <span>Decision boundary</span>
-            <p>
-              Agent intent → deterministic PolicyRail check → constraint envelope → autonomous adaptation → wallet signature.
-            </p>
-          </div>
+              <span>Decision boundary</span>
+              <p>
+                Agent intent → deterministic PolicyRail check → constraint envelope → autonomous adaptation → wallet signature.
+              </p>
+            </div>
 
             <button onClick={savePolicy} disabled={initializing || saving || !dirty}>
-            {saving ? "Saving policy…" : dirty ? "Save policy" : "Policy up to date"}
-          </button>
+              {saving ? "Saving policy…" : dirty ? "Save policy" : "Policy up to date"}
+            </button>
 
             <Link className="secondaryAction" href="/tasks/new">
               Test policy with agent →
