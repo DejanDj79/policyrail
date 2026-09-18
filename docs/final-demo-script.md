@@ -116,9 +116,13 @@ The procurement agent is still free to choose what it believes is the best resou
 
 ### When the expensive proposal is rejected
 
-Stop and point to:
+Do **not** pause or stop the task execution. Let the agent continue running.
+
+If the rejection is still visible in the Live Execution panel, briefly point to:
 
 **Constraint envelope returned to agent**
+
+If the flow moves too quickly, let the task finish and show the same rejection + constraint envelope in **View full audit**, where the event remains permanently visible.
 
 ### Say
 
