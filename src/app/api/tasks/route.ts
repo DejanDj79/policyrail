@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
 import { centsToAtomicUsdc } from "@/lib/money/usdc";
+import type { SpendingCategory } from "@/lib/policy/types";
 import { createClient } from "@/lib/supabase/server";
+
+const VALID_CATEGORIES = new Set<SpendingCategory>([
+  "search",
+  "data",
+  "compute",
+  "inference",
+  "other",
+]);
 
 interface CreateTaskBody {
   agentId?: string;
   prompt?: string;
   budgetCents?: number;
+  mandateAllowedCategories?: string[];
 }
 
 interface CompleteTaskBody {
@@ -53,7 +63,7 @@ export async function POST(request: Request) {
 
   const { data: policy, error: policyError } = await supabase
     .from("policies")
-    .select("task_budget_cents,task_budget_atomic")
+    .select("task_budget_cents,task_budget_atomic,allowed_categories")
     .eq("agent_id", agent.id)
     .single();
 
@@ -79,6 +89,35 @@ export async function POST(request: Request) {
   }
 
   const requestedBudgetAtomic = centsToAtomicUsdc(requestedBudgetCents);
+  const policyAllowedCategories = (policy.allowed_categories ?? []) as SpendingCategory[];
+  const requestedMandateCategories = Array.from(
+    new Set(
+      (body.mandateAllowedCategories ?? policyAllowedCategories)
+        .filter((category): category is SpendingCategory =>
+          VALID_CATEGORIES.has(category as SpendingCategory)
+        )
+    )
+  );
+
+  if (requestedMandateCategories.length === 0) {
+    return NextResponse.json(
+      { error: "Task mandate must allow at least one spending category." },
+      { status: 400 }
+    );
+  }
+
+  const outsidePolicy = requestedMandateCategories.filter(
+    (category) => !policyAllowedCategories.includes(category)
+  );
+
+  if (outsidePolicy.length > 0) {
+    return NextResponse.json(
+      {
+        error: `Task mandate cannot expand the agent policy. Not allowed: ${outsidePolicy.join(", ")}.`,
+      },
+      { status: 400 }
+    );
+  }
 
   const { data: task, error: taskError } = await supabase
     .from("tasks")
@@ -88,10 +127,11 @@ export async function POST(request: Request) {
       budget_cents: requestedBudgetCents,
       spent_cents: 0,
       spent_atomic: 0,
+      mandate_allowed_categories: requestedMandateCategories,
       status: "running",
     })
     .select(
-      "id,agent_id,prompt,budget_cents,budget_atomic,spent_cents,spent_atomic,status,created_at"
+      "id,agent_id,prompt,budget_cents,budget_atomic,spent_cents,spent_atomic,mandate_allowed_categories,status,created_at"
     )
     .single();
 
@@ -112,6 +152,8 @@ export async function POST(request: Request) {
       budget_atomic: requestedBudgetAtomic,
       policy_task_budget_cents: policy.task_budget_cents,
       policy_task_budget_atomic: policy.task_budget_atomic,
+      mandate_allowed_categories: requestedMandateCategories,
+      mandate_frozen: true,
     },
   });
 
