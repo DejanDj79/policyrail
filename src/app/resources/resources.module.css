@@ -1,8 +1,10 @@
 .page {
+  width: min(1160px, calc(100% - 40px));
   min-height: 100vh;
+  margin: 0 auto;
   background: #080a0f;
   color: #f5f7fb;
-  padding: 0 32px 72px;
+  padding: 28px 0 72px;
 }
 
 .nav {
@@ -419,8 +421,9 @@
 
 @media (max-width: 680px) {
   .page {
-    padding-left: 18px;
-    padding-right: 18px;
+    width: min(100% - 24px, 1160px);
+    padding-left: 0;
+    padding-right: 0;
   }
 
   .nav {
