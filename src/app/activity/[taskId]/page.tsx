@@ -351,7 +351,7 @@ export default function ActivityDetailPage() {
           <section className={styles.detailHeader}>
             <div>
               <p className={styles.eyebrow}>TASK EXECUTION RECORD</p>
-              <h1>{task.prompt}</h1>
+              <h1 title={task.prompt}>{task.prompt}</h1>
               <div className={styles.detailMeta}>
                 <span>{task.agent_name}</span>
                 <span>{dateLabel(task.created_at)}</span>
