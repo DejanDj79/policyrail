@@ -74,7 +74,10 @@
   line-height: 1.5;
 }
 
-.eyebrow,
+.eyebrow {
+  margin: 0 0 12px;
+}
+
 .label {
   margin: 0 0 8px;
   color: var(--accent);
