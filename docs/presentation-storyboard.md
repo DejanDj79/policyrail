@@ -4,15 +4,37 @@
 
 Target length: **2:20–2:40**
 
-Use **6 visual scenes**. Keep each scene visually simple: one headline, one core visual, at most 2–3 supporting points.
+Use **camera + 6 visual scenes + camera close**. Keep each visual scene simple: one headline, one core visual, at most 2–3 supporting points.
 
 Do not use the full product demo inside this video. The product demo is a separate submission asset.
 
 ---
 
+## Camera intro — Founder
+
+**Time:** 0:00–0:18
+
+### Visual
+
+Dejan on camera, clean background, medium framing.
+
+Optional lower-third:
+
+**Dejan — Software Developer, Robotics & Autonomous Systems**
+
+### Narration
+
+"Hi, I'm Dejan. I'm a software developer working in robotics and autonomous systems. I built PolicyRail because as AI agents become able to spend real money, I believe their financial authority should live outside the model."
+
+### Transition
+
+Simple cut or short fade into Scene 1.
+
+---
+
 ## Scene 1 — The problem
 
-**Time:** 0:00–0:22
+**Time:** 0:18–0:38
 
 ### Headline
 
@@ -42,7 +64,7 @@ Do not mention Solana or x402 yet.
 
 ## Scene 2 — PolicyRail
 
-**Time:** 0:22–0:48
+**Time:** 0:38–1:02
 
 ### Headline
 
@@ -72,7 +94,7 @@ PolicyRail box should be the visual focus, not the wallet.
 
 ## Scene 3 — The differentiator
 
-**Time:** 0:48–1:15
+**Time:** 1:02–1:27
 
 ### Headline
 
@@ -108,7 +130,7 @@ This is the most important slide in the entire presentation. Hold it long enough
 
 ## Scene 4 — Purpose + proof
 
-**Time:** 1:15–1:42
+**Time:** 1:27–1:49
 
 ### Headline
 
@@ -148,7 +170,7 @@ Show stylized receipt:
 
 ## Scene 5 — Why now / market
 
-**Time:** 1:42–2:08
+**Time:** 1:49–2:12
 
 ### Headline
 
@@ -178,7 +200,7 @@ Small line:
 
 ## Scene 6 — Go-to-market + close
 
-**Time:** 2:08–2:38
+**Time:** 2:12–2:31
 
 ### Headline
 
@@ -201,13 +223,23 @@ Bottom row:
 
 `SDK / API → Agent frameworks → Wallet & payment partners → Enterprise controls`
 
-Then fade to closing line:
-
-**Agents should be autonomous in their decisions — not sovereign over their financial authority.**
-
 ### Narration
 
 "Our initial users are developers building research agents, browser agents, model-routing agents and enterprise workflows that need to buy external resources programmatically. We integrate as a control layer in front of existing wallet and payment providers rather than asking teams to replace them. The long-term product expands into hierarchical budgets, task-purpose policies, organization controls, policy simulation and compliance reporting. Agents should be autonomous in their decisions, not sovereign over their financial authority."
+
+---
+
+## Camera close
+
+**Time:** 2:31–2:45
+
+### Visual
+
+Return to Dejan on camera.
+
+### Narration
+
+"Agents should be autonomous in their decisions, not sovereign over their financial authority. That is what PolicyRail is built to enforce."
 
 ---
 
