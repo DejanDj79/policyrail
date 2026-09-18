@@ -23,6 +23,7 @@ export type PolicyDecisionCode =
   | "DAILY_BUDGET_EXCEEDED"
   | "TRANSACTION_LIMIT_EXCEEDED"
   | "CATEGORY_NOT_ALLOWED"
+  | "TASK_CATEGORY_NOT_ALLOWED"
   | "PROVIDER_BLOCKED";
 
 export interface PolicyDecision {
