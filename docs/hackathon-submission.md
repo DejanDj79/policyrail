@@ -285,6 +285,55 @@ Repository:
 
 https://github.com/DejanDj79/policyrail
 
+## Demand validation
+
+We do not yet claim customer traction or completed user interviews.
+
+The current validation is market-side:
+
+- Amazon Bedrock AgentCore Payments now supports autonomous agent payments, x402, configurable spending budgets, wallet integrations and observability. That is strong evidence that agentic payments and spending governance are becoming a real infrastructure category.
+- AgentCore documentation explicitly describes research agents, browser agents, pay-per-intelligence and paid APIs as use cases for autonomous micropayments.
+- Existing infrastructure increasingly solves wallet access and payment execution, which creates room for a separate control-plane layer focused on task purpose, machine-readable policy feedback and autonomous adaptation after rejection.
+
+PolicyRail's hypothesis is that as agent payments become easier to execute, organizations will need richer economic governance than a binary allow/deny payment gate.
+
+### What we still need to validate after the hackathon
+
+- Which buyer feels the pain first: agent-platform developers, enterprise AI teams, or wallet/payment infrastructure providers.
+- Whether teams prefer PolicyRail as an SDK/API, a managed policy service, or an embedded control plane inside existing agent platforms.
+- Which policy primitives are most valuable beyond transaction limits: hierarchical budgets, purpose constraints, approvals, provider risk, or compliance reporting.
+- Willingness to pay for governance and audit infrastructure versus building these controls internally.
+
+## Go-to-market strategy
+
+### Initial users
+
+Start with developers building agents that autonomously purchase external resources:
+
+- research agents
+- browser agents
+- model-routing / inference agents
+- enterprise workflow agents
+- agents consuming x402-protected APIs, MCP servers, or paid datasets
+
+### Distribution
+
+1. **Developer-first SDK/API** — make PolicyRail easy to place between an agent planner and an existing wallet/payment provider.
+2. **x402-native integrations and examples** — publish reference integrations for common agent frameworks and paid-resource workflows.
+3. **Agent framework partnerships** — integrate at the middleware/tool layer where payment intent and policy feedback naturally meet.
+4. **Wallet/payment provider partnerships** — position PolicyRail above existing wallets rather than competing with custody and signing infrastructure.
+5. **Enterprise expansion** — add organization/team/agent/task budget hierarchies, policy simulation, reporting and compliance-oriented decision receipts.
+
+### Business model hypothesis
+
+Start as usage-based developer infrastructure:
+
+- free developer tier
+- paid tier based on policy evaluations / managed agents / decision receipts
+- enterprise plans for hierarchical policy, audit retention, SSO, approvals and compliance integrations
+
+This business model is still a hypothesis and should be validated through design-partner conversations after the hackathon.
+
 ## Primary ecosystem
 
 **Solana**
