@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import AppNav from "@/components/AppNav";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type WheelEvent } from "react";
 import BazaarPreview from "./BazaarPreview";
 import styles from "./resources.module.css";
 
@@ -56,6 +56,7 @@ export default function ResourcesPage() {
   const [sortMode, setSortMode] = useState<SortMode>("quality");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const resourceListRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,6 +136,24 @@ export default function ResourcesPage() {
   const highestPrice = resources.length
     ? Math.max(...resources.map((resource) => resource.amountCents))
     : 0;
+
+  function handleResourceWheel(event: WheelEvent<HTMLElement>) {
+    const list = resourceListRef.current;
+    if (!list || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+
+    const maxScrollLeft = list.scrollWidth - list.clientWidth;
+    if (maxScrollLeft <= 0) return;
+
+    const movingRight = event.deltaY > 0;
+    const canScroll =
+      (movingRight && list.scrollLeft < maxScrollLeft - 1) ||
+      (!movingRight && list.scrollLeft > 1);
+
+    if (!canScroll) return;
+
+    event.preventDefault();
+    list.scrollLeft += event.deltaY;
+  }
 
   return (
     <main className={styles.page}>
@@ -240,7 +259,11 @@ export default function ResourcesPage() {
       ) : filtered.length === 0 ? (
         <div className={styles.empty}>No resources match the selected filters.</div>
       ) : (
-        <section className={styles.grid}>
+        <section
+          className={styles.grid}
+          ref={resourceListRef}
+          onWheel={handleResourceWheel}
+        >
           {filtered.map((resource) => (
             <article className={styles.card} key={resource.id}>
               <div className={styles.cardTop}>
