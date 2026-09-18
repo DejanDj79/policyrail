@@ -10,7 +10,25 @@ Target length: **2:15–2:45**
 
 ---
 
-## 0:00–0:25 — Problem
+## 0:00–0:18 — Founder intro on camera
+
+### Screen
+
+Camera on Dejan.
+
+### Say
+
+"Hi, I'm Dejan. I'm a software developer working in robotics and autonomous systems.
+
+I built PolicyRail because as AI agents become able to spend real money, I believe their financial authority should live outside the model."
+
+---
+
+## 0:18–0:38 — Problem
+
+### Screen
+
+Transition from camera to Scene 1 visual.
 
 ### Say
 
@@ -22,7 +40,7 @@ Today, a spending limit can block a transaction. But a blocked transaction usual
 
 ---
 
-## 0:25–0:55 — Product
+## 0:38–1:02 — Product
 
 ### Say
 
@@ -36,7 +54,7 @@ The agent can then adapt autonomously without gaining authority to rewrite the r
 
 ---
 
-## 0:55–1:20 — Why this is different
+## 1:02–1:27 — Why this is different
 
 ### Say
 
@@ -52,7 +70,7 @@ And every approved or rejected decision creates a canonical, hash-addressed Poli
 
 ---
 
-## 1:20–1:45 — Why now
+## 1:27–1:49 — Why now
 
 ### Say
 
@@ -66,7 +84,7 @@ But as agents become more autonomous, companies will need a layer above the wall
 
 ---
 
-## 1:45–2:10 — Go to market
+## 1:49–2:12 — Go to market
 
 ### Say
 
@@ -78,7 +96,7 @@ Our first distribution path is developer-first: SDK and API integration, x402-na
 
 ---
 
-## 2:10–2:35 — Business / expansion
+## 2:12–2:31 — Business / expansion
 
 ### Say
 
@@ -88,7 +106,11 @@ The payment rail underneath can change. PolicyRail remains the control plane abo
 
 ---
 
-## 2:35–2:45 — Close
+## 2:31–2:45 — Close on camera
+
+### Screen
+
+Return to camera.
 
 ### Say
 
@@ -100,7 +122,7 @@ That is what PolicyRail is built to enforce."
 
 ## Recording guidance
 
-- Use camera + clean slides or product stills rather than doing the full live product flow here.
+- Start on camera for the founder introduction, move to clean slides/product stills, and return to camera for the final line.
 - Keep the product demo for the separate demo video.
 - Do not spend more than ~30 seconds on architecture.
 - Lead with the control problem, not Solana/x402.
