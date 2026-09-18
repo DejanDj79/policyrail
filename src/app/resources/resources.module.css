@@ -2,8 +2,7 @@
   width: min(1160px, calc(100% - 40px));
   min-height: 100vh;
   margin: 0 auto;
-  background: #080a0f;
-  color: #f5f7fb;
+  color: var(--text);
   padding: 28px 0 72px;
 }
 
