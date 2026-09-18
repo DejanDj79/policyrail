@@ -60,64 +60,71 @@ export default function WalletCard() {
     loadWallet();
   }, [loadWallet]);
 
+  const cluster = wallet?.cluster ?? "devnet";
+  const explorerHref = wallet?.address
+    ? `https://explorer.solana.com/address/${wallet.address}?cluster=${encodeURIComponent(cluster)}`
+    : "#";
+
   return (
-    <section className={styles.card}>
-      <div className={styles.header}>
-        <div>
-          <p className={styles.label}>AGENT WALLET</p>
-          <h2 className={styles.title}>x402 spending wallet</h2>
+    <aside className={styles.wallet}>
+      <div className={styles.heading}>
+        <span>AGENT WALLET</span>
+        <div className={styles.actions}>
+          <button
+            className={styles.iconButton}
+            type="button"
+            onClick={loadWallet}
+            disabled={loading}
+            aria-label={loading ? "Refreshing wallet balance" : "Refresh wallet balance"}
+            title={loading ? "Refreshing…" : "Refresh wallet balance"}
+          >
+            ↻
+          </button>
+
+          <span
+            className={styles.info}
+            tabIndex={0}
+            aria-label="Live wallet balance. PolicyRail limits how much the agent may spend; approved x402 payments settle from this wallet."
+          >
+            i
+            <span className={styles.tooltip}>
+              Live wallet balance. PolicyRail limits how much the agent may spend; approved x402 payments settle from this wallet.
+            </span>
+          </span>
         </div>
-        <span className={styles.network}>
-          {wallet?.network ?? "SOLANA DEVNET"}
-        </span>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
       {loading && !wallet ? (
-        <p className={styles.loading}>Reading live balance from Solana…</p>
+        <p className={styles.loading}>Reading wallet…</p>
       ) : wallet ? (
-        <>
-          <div className={styles.metrics}>
-            <div className={styles.metric}>
-              <span>USDC balance</span>
-              <strong>{displayUsdc(wallet.usdcBalance)}</strong>
-            </div>
-            <div className={styles.metric}>
-              <span>SOL balance</span>
-              <strong>{wallet.solBalance ?? "0.0000"}</strong>
-            </div>
+        <div className={styles.rows}>
+          <div className={styles.row}>
+            <span>Network</span>
+            <strong>{wallet.network ?? "Solana Devnet"}</strong>
           </div>
-
-          <div className={styles.addressBlock}>
-            <span>Wallet address</span>
-            <div className={styles.addressRow}>
-              <code title={wallet.address}>{shortAddress(wallet.address!)}</code>
-              <a
-                href={`https://explorer.solana.com/address/${wallet.address}?cluster=devnet`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Explorer ↗
-              </a>
-            </div>
+          <div className={styles.row}>
+            <span>USDC</span>
+            <strong>{displayUsdc(wallet.usdcBalance)}</strong>
           </div>
-
-          <div className={styles.footer}>
-            <p className={styles.note}>
-              Live wallet balance. Policy limits how much the agent may spend.
-            </p>
-            <button
-              className={styles.refresh}
-              type="button"
-              onClick={loadWallet}
-              disabled={loading}
+          <div className={styles.row}>
+            <span>SOL</span>
+            <strong>{wallet.solBalance ?? "0.0000"}</strong>
+          </div>
+          <div className={styles.row}>
+            <span>Address</span>
+            <a
+              href={explorerHref}
+              target="_blank"
+              rel="noreferrer"
+              title={wallet.address}
             >
-              {loading ? "Refreshing…" : "Refresh balance"}
-            </button>
+              {shortAddress(wallet.address!)}
+            </a>
           </div>
-        </>
+        </div>
       ) : null}
-    </section>
+    </aside>
   );
 }
