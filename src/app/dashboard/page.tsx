@@ -38,6 +38,7 @@ type DashboardPayload = {
     completedTasks: number;
     rejectedPayments: number;
     settledPayments: number;
+    decisionReceipts: number;
   };
   recentTasks: Array<{
     id: string;
@@ -241,9 +242,9 @@ export default function DashboardPage() {
               <small>Real settled x402 payments</small>
             </div>
             <div className={styles.metric}>
-              <span>Completed tasks</span>
-              <strong>{data.summary.completedTasks}</strong>
-              <small>Autonomous tasks completed</small>
+              <span>Decision receipts</span>
+              <strong>{data.summary.decisionReceipts}</strong>
+              <small>Hash-addressed policy decisions</small>
             </div>
             <div className={styles.metric}>
               <span>Settled payments</span>
