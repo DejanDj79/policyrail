@@ -25,6 +25,7 @@ type Policy = {
   task_budget_cents: number;
   daily_budget_cents: number;
   max_transaction_cents: number;
+  allowed_categories: string[];
 };
 
 type Attempt = {
@@ -129,6 +130,7 @@ export default function NewTaskPage() {
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [prompt, setPrompt] = useState("");
   const [budget, setBudget] = useState("");
+  const [mandateCategories, setMandateCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -164,6 +166,7 @@ export default function NewTaskPage() {
           setAgent(payload.agent);
           setPolicy(payload.policy);
           setBudget((payload.policy.task_budget_cents / 100).toFixed(2));
+          setMandateCategories(payload.policy.allowed_categories ?? []);
         }
       } catch (setupError) {
         if (!cancelled) {
@@ -180,6 +183,24 @@ export default function NewTaskPage() {
       cancelled = true;
     };
   }, [supabase]);
+
+  function setDemoPreset(task: string, preferredCategories: string[]) {
+    setPrompt(task);
+    if (!policy) return;
+
+    const scoped = preferredCategories.filter((category) =>
+      policy.allowed_categories.includes(category)
+    );
+    setMandateCategories(scoped.length > 0 ? scoped : policy.allowed_categories);
+  }
+
+  function toggleMandateCategory(category: string) {
+    setMandateCategories((current) =>
+      current.includes(category)
+        ? current.filter((item) => item !== category)
+        : [...current, category]
+    );
+  }
 
   async function runTask() {
     if (!agent || !policy) return;
@@ -202,6 +223,19 @@ export default function NewTaskPage() {
       return;
     }
 
+    if (mandateCategories.length === 0) {
+      setError("Task mandate must allow at least one spending category.");
+      return;
+    }
+
+    const invalidMandateCategories = mandateCategories.filter(
+      (category) => !policy.allowed_categories.includes(category)
+    );
+    if (invalidMandateCategories.length > 0) {
+      setError("Task mandate cannot expand the agent policy.");
+      return;
+    }
+
     setRunning(true);
     setError(null);
     setDiscovery(null);
@@ -218,6 +252,7 @@ export default function NewTaskPage() {
           agentId: agent.id,
           prompt: trimmedPrompt,
           budgetCents,
+          mandateAllowedCategories: mandateCategories,
         }),
       });
 
@@ -294,7 +329,9 @@ export default function NewTaskPage() {
                 className={styles.preset}
                 type="button"
                 disabled={loading || running}
-                onClick={() => setPrompt(INFERENCE_DEMO_TASK)}
+                onClick={() =>
+                  setDemoPreset(INFERENCE_DEMO_TASK, ["search", "data", "inference"])
+                }
               >
                 Inference demo
               </button>
@@ -302,7 +339,9 @@ export default function NewTaskPage() {
                 className={styles.preset}
                 type="button"
                 disabled={loading || running}
-                onClick={() => setPrompt(TRAVEL_DEMO_TASK)}
+                onClick={() =>
+                  setDemoPreset(TRAVEL_DEMO_TASK, ["search", "data"])
+                }
               >
                 Travel demo
               </button>
@@ -328,6 +367,36 @@ export default function NewTaskPage() {
             <p>
               Synthetic resources cover AI inference and Barcelona hotel research. Discovery selects
               only domain-relevant resources before procurement.
+            </p>
+          </div>
+
+          <div className={styles.mandateBlock}>
+            <div className={styles.mandateHeader}>
+              <div>
+                <strong>Task spending mandate</strong>
+                <span>Frozen when the task starts · can narrow agent policy, never expand it</span>
+              </div>
+              <span className={styles.mandateBadge}>PURPOSE BOUND</span>
+            </div>
+            <div className={styles.mandateCategories}>
+              {(policy?.allowed_categories ?? []).map((category) => {
+                const selected = mandateCategories.includes(category);
+                return (
+                  <button
+                    type="button"
+                    key={category}
+                    className={selected ? styles.mandateSelected : styles.mandateOption}
+                    disabled={loading || running}
+                    onClick={() => toggleMandateCategory(category)}
+                  >
+                    {category}
+                  </button>
+                );
+              })}
+            </div>
+            <p>
+              Resource discovery and deterministic authorization are both constrained to this task scope.
+              The AI cannot add categories after execution begins.
             </p>
           </div>
 
