@@ -141,7 +141,7 @@ export default function ResourcesPage() {
     const list = resourceListRef.current;
     if (!list || loading || filtered.length === 0) return;
 
-    function onWheel(event: WheelEvent) {
+    function onWheel(event: globalThis.WheelEvent) {
       const maxScrollLeft = list.scrollWidth - list.clientWidth;
       if (maxScrollLeft <= 1) return;
 
@@ -154,9 +154,9 @@ export default function ResourcesPage() {
 
       let delta = rawDelta;
 
-      if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+      if (event.deltaMode === 1) {
         delta = Math.sign(rawDelta) * 120;
-      } else if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+      } else if (event.deltaMode === 2) {
         delta = Math.sign(rawDelta) * Math.max(240, list.clientWidth * 0.75);
       } else if (Math.abs(rawDelta) < 24) {
         delta = rawDelta * 3;
