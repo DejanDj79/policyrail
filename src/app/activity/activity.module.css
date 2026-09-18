@@ -62,7 +62,7 @@
   justify-content: space-between;
   gap: 32px;
   align-items: end;
-  padding: 82px 0 38px;
+  padding: 64px 0 38px;
 }
 
 .heroText {
@@ -273,7 +273,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 28px;
   align-items: end;
-  padding: 66px 0 28px;
+  padding: 64px 0 28px;
 }
 
 .detailHeader h1 {
