@@ -186,19 +186,12 @@ export default function PolicyPage() {
       <AppNav active="policy" />
 
       <section className="settingsHero">
-        <div>
-          <p className="eyebrow">AGENT POLICY</p>
-          <h1 className="settingsTitle">Define the economic boundary agents can negotiate within.</h1>
-          <p className="lede settingsLede">
-            These rules are enforced deterministically outside the AI. A rejected purchase returns a
-            machine-readable constraint envelope, so the agent can adapt without gaining authority to change the policy.
-          </p>
-        </div>
-        <div className="policyState">
-          <span className="status">{initializing ? "LOADING" : "ACTIVE POLICY"}</span>
-          <strong>{agent?.name ?? "ResearchBot"}</strong>
-          <p>Changes take effect on the next procurement decision.</p>
-        </div>
+        <p className="eyebrow">AGENT POLICY</p>
+        <h1 className="settingsTitle">Define the economic boundary agents can negotiate within.</h1>
+        <p className="lede settingsLede">
+          These rules are enforced deterministically outside the AI. A rejected purchase returns a
+          machine-readable constraint envelope, so the agent can adapt without gaining authority to change the policy.
+        </p>
       </section>
 
       {error ? <p className="errorMessage settingsMessage">{error}</p> : null}
@@ -337,9 +330,16 @@ export default function PolicyPage() {
           </section>
         </div>
 
-        <aside className="policySummary panel">
-          <p className="label">CURRENT POLICY</p>
-          <h2>Enforcement preview</h2>
+        <aside className="policySidebar">
+          <div className="policyState">
+            <span className="status">{initializing ? "LOADING" : "ACTIVE POLICY"}</span>
+            <strong>{agent?.name ?? "ResearchBot"}</strong>
+            <p>Changes take effect on the next procurement decision.</p>
+          </div>
+
+          <section className="policySummary panel">
+            <p className="label">CURRENT POLICY</p>
+            <h2>Enforcement preview</h2>
           <div className="summaryRows">
             <div>
               <span>Task budget</span>
@@ -370,9 +370,10 @@ export default function PolicyPage() {
             {saving ? "Saving policy…" : dirty ? "Save policy" : "Policy up to date"}
           </button>
 
-          <Link className="secondaryAction" href="/">
-            Test policy with agent →
-          </Link>
+            <Link className="secondaryAction" href="/">
+              Test policy with agent →
+            </Link>
+          </section>
         </aside>
       </section>
     </main>
