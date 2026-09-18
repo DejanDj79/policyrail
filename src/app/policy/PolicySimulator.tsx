@@ -47,7 +47,13 @@ function correctionLabel(envelope: SimulationEnvelope) {
   return `Use a provider outside the blocked list${blocked.length ? `: ${blocked.join(", ")}` : ""}.`;
 }
 
-export default function PolicySimulator({ agentId }: { agentId: string }) {
+export default function PolicySimulator({
+  agentId,
+  policyDirty = false,
+}: {
+  agentId: string;
+  policyDirty?: boolean;
+}) {
   const [provider, setProvider] = useState("example-provider");
   const [category, setCategory] = useState("data");
   const [amountUsdc, setAmountUsdc] = useState("0.18");
@@ -95,9 +101,15 @@ export default function PolicySimulator({ agentId }: { agentId: string }) {
       </div>
 
       <p className="lede settingsLede">
-        Test a hypothetical purchase against the live policy. No payment request,
+        Test a hypothetical purchase against the currently saved policy. No payment request,
         audit event, decision receipt or ledger reservation is created.
       </p>
+
+      {policyDirty ? (
+        <p className="errorMessage settingsMessage">
+          Save the policy changes first so the simulator and real enforcement evaluate the same policy version.
+        </p>
+      ) : null}
 
       <div className="formGrid">
         <label className="field">
@@ -105,7 +117,7 @@ export default function PolicySimulator({ agentId }: { agentId: string }) {
           <small>Name or domain the agent wants to pay.</small>
           <input
             value={provider}
-            disabled={running}
+            disabled={running || policyDirty}
             onChange={(event) => setProvider(event.target.value)}
           />
         </label>
@@ -115,7 +127,7 @@ export default function PolicySimulator({ agentId }: { agentId: string }) {
           <small>Spending category for the proposed resource.</small>
           <select
             value={category}
-            disabled={running}
+            disabled={running || policyDirty}
             onChange={(event) => setCategory(event.target.value)}
           >
             <option value="search">Search</option>
@@ -136,14 +148,18 @@ export default function PolicySimulator({ agentId }: { agentId: string }) {
               min="0.000001"
               step="0.000001"
               value={amountUsdc}
-              disabled={running}
+              disabled={running || policyDirty}
               onChange={(event) => setAmountUsdc(event.target.value)}
             />
           </div>
         </label>
       </div>
 
-      <button type="button" onClick={simulate} disabled={running || !provider || !amountUsdc}>
+      <button
+        type="button"
+        onClick={simulate}
+        disabled={running || policyDirty || !provider || !amountUsdc}
+      >
         {running ? "Simulating…" : "Simulate decision"}
       </button>
 
