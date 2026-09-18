@@ -197,10 +197,10 @@ export default function PolicyPage() {
       <section className="settingsHero">
         <div>
           <p className="eyebrow">AGENT POLICY</p>
-          <h1 className="settingsTitle">Control what the agent can spend.</h1>
+          <h1 className="settingsTitle">Define the economic boundary agents can negotiate within.</h1>
           <p className="lede settingsLede">
-            These rules are enforced deterministically before the wallet signs an x402 payment.
-            The AI can propose a purchase, but it cannot override this policy.
+            These rules are enforced deterministically outside the AI. A rejected purchase returns a
+            machine-readable constraint envelope, so the agent can adapt without gaining authority to change the policy.
           </p>
         </div>
         <div className="policyState">
