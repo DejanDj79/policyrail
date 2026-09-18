@@ -340,7 +340,7 @@ export default function PolicyPage() {
           <section className="policySummary panel">
             <p className="label">CURRENT POLICY</p>
             <h2>Enforcement preview</h2>
-          <div className="summaryRows">
+            <div className="summaryRows">
             <div>
               <span>Task budget</span>
               <strong>${form?.taskBudget || "0.00"}</strong>
@@ -359,18 +359,18 @@ export default function PolicyPage() {
             </div>
           </div>
 
-          <div className="policyExplanation">
+            <div className="policyExplanation">
             <span>Decision boundary</span>
             <p>
               Agent intent → deterministic PolicyRail check → constraint envelope → autonomous adaptation → wallet signature.
             </p>
           </div>
 
-          <button onClick={savePolicy} disabled={initializing || saving || !dirty}>
+            <button onClick={savePolicy} disabled={initializing || saving || !dirty}>
             {saving ? "Saving policy…" : dirty ? "Save policy" : "Policy up to date"}
           </button>
 
-            <Link className="secondaryAction" href="/">
+            <Link className="secondaryAction" href="/tasks/new">
               Test policy with agent →
             </Link>
           </section>
