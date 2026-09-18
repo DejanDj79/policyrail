@@ -12,6 +12,13 @@ export interface AuthorizationRequest {
   amountAtomic: number;
 }
 
+export interface PolicySimulationRequest {
+  agentId: string;
+  provider: string;
+  category: SpendingCategory;
+  amountAtomic: number;
+}
+
 export interface FinalizeSettlementRequest {
   paymentRequestId: string;
   status: "simulated" | "settled";
@@ -53,6 +60,15 @@ interface AtomicAuthorizationResult {
   paymentRequestId: string;
   agentId: string;
   taskId: string;
+}
+
+export interface PolicySimulationResult {
+  simulation: true;
+  ledgerMutated: false;
+  approved: boolean;
+  code: PolicyDecisionCode;
+  reason: string;
+  policyEnvelope: PolicyConstraintEnvelope;
 }
 
 const DECISION_CODES = new Set<PolicyDecisionCode>([
@@ -136,7 +152,7 @@ function parseRequiredChange(value: unknown): PolicyRequiredChange | null {
   return parsed;
 }
 
-function parsePolicyEnvelope(value: unknown): PolicyConstraintEnvelope {
+export function parsePolicyEnvelope(value: unknown): PolicyConstraintEnvelope {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Invalid policy constraint envelope");
   }
@@ -185,9 +201,9 @@ function parsePolicyEnvelope(value: unknown): PolicyConstraintEnvelope {
   };
 }
 
-function parseAuthorizationResult(value: unknown): AtomicAuthorizationResult {
+function parseDecisionFields(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("Invalid authorization RPC response");
+    throw new Error("Invalid policy decision RPC response");
   }
 
   const result = value as Record<string, unknown>;
@@ -204,6 +220,20 @@ function parseAuthorizationResult(value: unknown): AtomicAuthorizationResult {
   if (typeof result.reason !== "string" || !result.reason.trim()) {
     throw new Error("Invalid authorization reason");
   }
+
+  return {
+    raw: result,
+    approved: result.approved,
+    code: result.code as PolicyDecisionCode,
+    reason: result.reason,
+    policyEnvelope: parsePolicyEnvelope(result.policyEnvelope),
+  };
+}
+
+function parseAuthorizationResult(value: unknown): AtomicAuthorizationResult {
+  const parsed = parseDecisionFields(value);
+  const result = parsed.raw;
+
   if (
     typeof result.paymentRequestId !== "string" ||
     typeof result.agentId !== "string" ||
@@ -213,9 +243,9 @@ function parseAuthorizationResult(value: unknown): AtomicAuthorizationResult {
   }
 
   return {
-    approved: result.approved,
-    code: result.code as PolicyDecisionCode,
-    reason: result.reason,
+    approved: parsed.approved,
+    code: parsed.code,
+    reason: parsed.reason,
     remainingTaskBudgetAtomic: safeAtomic(
       result.remainingTaskBudgetAtomic,
       "remaining task budget"
@@ -224,10 +254,28 @@ function parseAuthorizationResult(value: unknown): AtomicAuthorizationResult {
       result.remainingDailyBudgetAtomic,
       "remaining daily budget"
     ),
-    policyEnvelope: parsePolicyEnvelope(result.policyEnvelope),
+    policyEnvelope: parsed.policyEnvelope,
     paymentRequestId: result.paymentRequestId,
     agentId: result.agentId,
     taskId: result.taskId,
+  };
+}
+
+function parsePolicySimulationResult(value: unknown): PolicySimulationResult {
+  const parsed = parseDecisionFields(value);
+  const result = parsed.raw;
+
+  if (result.simulation !== true || result.ledgerMutated !== false) {
+    throw new Error("Invalid policy simulation markers");
+  }
+
+  return {
+    simulation: true,
+    ledgerMutated: false,
+    approved: parsed.approved,
+    code: parsed.code,
+    reason: parsed.reason,
+    policyEnvelope: parsed.policyEnvelope,
   };
 }
 
@@ -259,6 +307,35 @@ export async function authorizePaymentForTask(
   }
 
   return parseAuthorizationResult(data);
+}
+
+export async function simulatePaymentPolicy(
+  supabase: SupabaseClient,
+  request: PolicySimulationRequest
+) {
+  if (!Number.isSafeInteger(request.amountAtomic) || request.amountAtomic <= 0) {
+    throw new Error("Invalid atomic USDC amount");
+  }
+
+  const agentId = request.agentId.trim();
+  const provider = request.provider.trim();
+
+  if (!agentId || !provider || !SPENDING_CATEGORIES.has(request.category)) {
+    throw new Error("Invalid policy simulation request");
+  }
+
+  const { data, error } = await supabase.rpc("simulate_payment_atomic", {
+    p_agent_id: agentId,
+    p_provider: provider,
+    p_category: request.category,
+    p_amount_atomic: request.amountAtomic,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return parsePolicySimulationResult(data);
 }
 
 export async function finalizePaymentSettlement(
