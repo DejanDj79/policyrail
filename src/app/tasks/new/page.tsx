@@ -7,6 +7,10 @@ import {
   formatAtomicUsdDisplay,
 } from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/client";
+import {
+  solanaExplorerTransactionUrl,
+  solanaNetworkLabel,
+} from "@/lib/x402/network-display";
 import AgentResult from "./AgentResult";
 import LiveExecution from "./LiveExecution";
 import styles from "./new-task.module.css";
@@ -33,7 +37,23 @@ type Attempt = {
   approved: boolean;
   policyReason: string;
   decisionCode: string;
+  policyEnvelope: {
+    maxTransactionAtomic: number;
+    remainingTaskBudgetAtomic: number;
+    remainingDailyBudgetAtomic: number;
+    maxCompliantAmountAtomic: number;
+    retryAllowed: boolean;
+    requiredChange: {
+      field: "provider" | "category" | "amountAtomic";
+      operator: "not_in" | "in" | "lte";
+      maxAtomic?: number;
+      allowedCategories?: string[];
+      blockedProviders?: string[];
+    } | null;
+  };
   settlementStatus: "not_applicable" | "simulated" | "settled";
+  settlementNetwork: string;
+  settlementAsset: string;
   transactionSignature: string | null;
 };
 
@@ -84,6 +104,23 @@ function responseSpendAtomic(payload: RunPayload) {
 
 function shortSignature(signature: string) {
   return `${signature.slice(0, 9)}…${signature.slice(-7)}`;
+}
+
+function envelopeCorrection(attempt: Attempt) {
+  const change = attempt.policyEnvelope.requiredChange;
+  if (!change) return null;
+
+  if (change.field === "amountAtomic") {
+    return `Retry at or below ${formatAtomicUsdDisplay(
+      change.maxAtomic ?? attempt.policyEnvelope.maxCompliantAmountAtomic
+    )}`;
+  }
+
+  if (change.field === "category") {
+    return `Retry with category: ${(change.allowedCategories ?? []).join(", ") || "allowed category"}`;
+  }
+
+  return `Retry with another provider${change.blockedProviders?.length ? ` (blocked: ${change.blockedProviders.join(", ")})` : ""}`;
 }
 
 export default function NewTaskPage() {
@@ -403,13 +440,24 @@ export default function NewTaskPage() {
                 </div>
                 <p><b>Agent:</b> {attempt.agentRationale}</p>
                 <p><b>PolicyRail:</b> {attempt.policyReason}</p>
+                {!attempt.approved ? (
+                  <p>
+                    <b>Constraint envelope → agent:</b>{" "}
+                    Max compliant {formatAtomicUsdDisplay(attempt.policyEnvelope.maxCompliantAmountAtomic)}
+                    {envelopeCorrection(attempt) ? ` · ${envelopeCorrection(attempt)}` : ""}
+                    {attempt.policyEnvelope.retryAllowed ? " · autonomous retry allowed" : ""}
+                  </p>
+                ) : null}
                 {attempt.transactionSignature ? (
                   <a
-                    href={`https://explorer.solana.com/tx/${attempt.transactionSignature}?cluster=devnet`}
+                    href={solanaExplorerTransactionUrl(
+                      attempt.transactionSignature,
+                      attempt.settlementNetwork
+                    )}
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Settled · {shortSignature(attempt.transactionSignature)} ↗
+                    Settled · {solanaNetworkLabel(attempt.settlementNetwork)} · {shortSignature(attempt.transactionSignature)} ↗
                   </a>
                 ) : null}
               </div>
