@@ -216,7 +216,9 @@ export default function PolicyPage() {
       <section className="settingsGrid">
         <div className="settingsMain">
           {!initializing && agent ? <WalletCard /> : null}
-          {!initializing && agent ? <PolicySimulator agentId={agent.id} /> : null}
+          {!initializing && agent ? (
+            <PolicySimulator agentId={agent.id} policyDirty={dirty} />
+          ) : null}
 
           <section className="panel settingsPanel">
             <div className="panelHeader">
