@@ -467,6 +467,32 @@ button:disabled {
   line-height: 1.45;
 }
 
+.field > input,
+.field > select {
+  width: 100%;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  outline: 0;
+  background: var(--panel-soft);
+  color: var(--text);
+  padding: 13px 14px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.field > input:focus,
+.field > select:focus {
+  border-color: rgba(134, 247, 200, 0.5);
+  box-shadow: 0 0 0 3px rgba(134, 247, 200, 0.06);
+}
+
+.field > input:disabled,
+.field > select:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
 .moneyInput {
   display: grid;
   grid-template-columns: auto 1fr;
