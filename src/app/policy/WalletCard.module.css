@@ -86,6 +86,26 @@
   transform: translateY(0);
 }
 
+.balance {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin: 4px 0 14px;
+}
+
+.balance strong {
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+.balance span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
 .rows {
   border-top: 1px solid var(--border);
 }
