@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import AppNav from "@/components/AppNav";
-import { useEffect, useMemo, useRef, useState, type WheelEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import BazaarPreview from "./BazaarPreview";
 import styles from "./resources.module.css";
 
@@ -137,23 +137,40 @@ export default function ResourcesPage() {
     ? Math.max(...resources.map((resource) => resource.amountCents))
     : 0;
 
-  function handleResourceWheel(event: WheelEvent<HTMLElement>) {
+  useEffect(() => {
     const list = resourceListRef.current;
-    if (!list || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    if (!list || loading || filtered.length === 0) return;
 
-    const maxScrollLeft = list.scrollWidth - list.clientWidth;
-    if (maxScrollLeft <= 0) return;
+    function onWheel(event: globalThis.WheelEvent) {
+      const maxScrollLeft = list.scrollWidth - list.clientWidth;
+      if (maxScrollLeft <= 1) return;
 
-    const movingRight = event.deltaY > 0;
-    const canScroll =
-      (movingRight && list.scrollLeft < maxScrollLeft - 1) ||
-      (!movingRight && list.scrollLeft > 1);
+      const delta =
+        Math.abs(event.deltaY) >= Math.abs(event.deltaX)
+          ? event.deltaY
+          : event.deltaX;
 
-    if (!canScroll) return;
+      if (delta === 0) return;
 
-    event.preventDefault();
-    list.scrollLeft += event.deltaY;
-  }
+      const movingRight = delta > 0;
+      const atStart = list.scrollLeft <= 1;
+      const atEnd = list.scrollLeft >= maxScrollLeft - 1;
+
+      if ((movingRight && atEnd) || (!movingRight && atStart)) return;
+
+      event.preventDefault();
+      list.scrollLeft = Math.max(
+        0,
+        Math.min(maxScrollLeft, list.scrollLeft + delta)
+      );
+    }
+
+    list.addEventListener("wheel", onWheel, { passive: false });
+
+    return () => {
+      list.removeEventListener("wheel", onWheel);
+    };
+  }, [loading, filtered.length]);
 
   return (
     <main className={styles.page}>
@@ -262,7 +279,6 @@ export default function ResourcesPage() {
         <section
           className={styles.grid}
           ref={resourceListRef}
-          onWheel={handleResourceWheel}
         >
           {filtered.map((resource) => (
             <article className={styles.card} key={resource.id}>
