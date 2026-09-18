@@ -7,6 +7,10 @@ import {
   formatAtomicUsdDisplay,
 } from "@/lib/money/usdc";
 import { createClient } from "@/lib/supabase/client";
+import {
+  solanaExplorerTransactionUrl,
+  solanaNetworkLabel,
+} from "@/lib/x402/network-display";
 import styles from "./dashboard.module.css";
 
 type DashboardPayload = {
@@ -60,6 +64,7 @@ type DashboardPayload = {
     reason: string;
     settlement_status: string;
     transaction_signature: string | null;
+    settlement_network: string | null;
     created_at: string;
     settled_at: string | null;
   }>;
@@ -212,9 +217,9 @@ export default function DashboardPage() {
       <section className={styles.hero}>
         <div>
           <p className={styles.eyebrow}>CONTROL CENTER</p>
-          <h1>See what your agent spends — and why.</h1>
+          <h1>See what your agent tried — and how policy shaped the outcome.</h1>
           <p>
-            Live policy, autonomous task activity and real x402 settlement history in one place.
+            Follow autonomous intent, deterministic policy negotiation, adaptation and real x402 settlement in one place.
           </p>
         </div>
         <div className={styles.heroActions}>
@@ -246,9 +251,9 @@ export default function DashboardPage() {
               <small>Successful Solana settlements</small>
             </div>
             <div className={styles.metric}>
-              <span>Blocked attempts</span>
+              <span>Policy interventions</span>
               <strong>{data.summary.rejectedPayments}</strong>
-              <small>Stopped by active policy</small>
+              <small>Constraint envelopes returned to the agent</small>
             </div>
           </section>
 
@@ -379,7 +384,7 @@ export default function DashboardPage() {
             <div className={styles.panelHeader}>
               <div>
                 <p className={styles.label}>RECENT ACTIVITY</p>
-                <h2>Policy decisions & settlements</h2>
+                <h2>Policy negotiation & settlement</h2>
               </div>
               <Link className={styles.secondaryAction} href="/activity">Full audit</Link>
             </div>
@@ -394,7 +399,7 @@ export default function DashboardPage() {
                       <div className={styles.paymentTitle}>
                         <strong>{payment.provider} · {payment.resource}</strong>
                         <span className={styles.paymentMeta}>
-                          {payment.category} · {dateLabel(payment.created_at)}
+                          {payment.category} · {payment.decision_code} · {dateLabel(payment.created_at)}
                         </span>
                       </div>
                       <span className={styles.paymentAmount}>
@@ -426,10 +431,16 @@ export default function DashboardPage() {
                     {payment.transaction_signature ? (
                       <a
                         className={styles.txLink}
-                        href={`https://explorer.solana.com/tx/${payment.transaction_signature}?cluster=devnet`}
+                        href={solanaExplorerTransactionUrl(
+                          payment.transaction_signature,
+                          payment.settlement_network
+                        )}
                         target="_blank"
                         rel="noreferrer"
                       >
+                        {payment.settlement_network
+                          ? `${solanaNetworkLabel(payment.settlement_network)} · `
+                          : ""}
                         {shortSignature(payment.transaction_signature)} ↗
                       </a>
                     ) : null}
