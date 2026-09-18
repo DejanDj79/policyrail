@@ -380,7 +380,15 @@ button:disabled {
 }
 
 .settingsHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 48px;
+  align-items: start;
   padding: 64px 0 44px;
+}
+
+.settingsHeroCopy {
+  min-width: 0;
 }
 
 .settingsTitle {
@@ -654,7 +662,8 @@ textarea:focus {
 
 @media (max-width: 820px) {
   .grid,
-  .settingsGrid {
+  .settingsGrid,
+  .settingsHero {
     grid-template-columns: 1fr;
   }
 
@@ -663,6 +672,7 @@ textarea:focus {
   }
 
   .settingsHero {
+    gap: 28px;
     padding-top: 48px;
   }
 
