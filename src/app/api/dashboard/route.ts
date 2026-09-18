@@ -161,9 +161,40 @@ export async function GET() {
       spent_atomic: requireAtomic(task.spent_atomic, "task spend"),
     }));
 
+    const recentPaymentIds = (recentPaymentsResult.data ?? []).map((payment) => payment.id);
+    let settlementNetworkByPayment = new Map<string, string>();
+
+    if (recentPaymentIds.length > 0) {
+      const { data: settlementEvents, error: settlementEventsError } = await supabase
+        .from("audit_events")
+        .select("payment_request_id,payload")
+        .in("payment_request_id", recentPaymentIds)
+        .eq("event_type", "payment_settled");
+
+      if (settlementEventsError) {
+        return NextResponse.json({ error: settlementEventsError.message }, { status: 500 });
+      }
+
+      settlementNetworkByPayment = new Map(
+        (settlementEvents ?? [])
+          .map((event) => {
+            const payload =
+              event.payload && typeof event.payload === "object" && !Array.isArray(event.payload)
+                ? event.payload as Record<string, unknown>
+                : null;
+            const network = typeof payload?.network === "string" ? payload.network : null;
+            return event.payment_request_id && network
+              ? [event.payment_request_id, network] as const
+              : null;
+          })
+          .filter((entry): entry is readonly [string, string] => entry !== null)
+      );
+    }
+
     const recentPayments = (recentPaymentsResult.data ?? []).map((payment) => ({
       ...payment,
       amount_atomic: requireAtomic(payment.amount_atomic, "payment amount"),
+      settlement_network: settlementNetworkByPayment.get(payment.id) ?? null,
     }));
 
     return NextResponse.json({
