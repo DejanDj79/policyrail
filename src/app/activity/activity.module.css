@@ -277,7 +277,11 @@
 }
 
 .detailHeader h1 {
+  display: -webkit-box;
   max-width: 920px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-size: clamp(26px, 3vw, 40px);
   line-height: 1.15;
   letter-spacing: -0.035em;
