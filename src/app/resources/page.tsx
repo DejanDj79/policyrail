@@ -145,12 +145,22 @@ export default function ResourcesPage() {
       const maxScrollLeft = list.scrollWidth - list.clientWidth;
       if (maxScrollLeft <= 1) return;
 
-      const delta =
+      const rawDelta =
         Math.abs(event.deltaY) >= Math.abs(event.deltaX)
           ? event.deltaY
           : event.deltaX;
 
-      if (delta === 0) return;
+      if (rawDelta === 0) return;
+
+      let delta = rawDelta;
+
+      if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+        delta = Math.sign(rawDelta) * 120;
+      } else if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+        delta = Math.sign(rawDelta) * Math.max(240, list.clientWidth * 0.75);
+      } else if (Math.abs(rawDelta) < 24) {
+        delta = rawDelta * 3;
+      }
 
       const movingRight = delta > 0;
       const atStart = list.scrollLeft <= 1;
