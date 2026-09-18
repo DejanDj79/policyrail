@@ -78,6 +78,8 @@ type RunPayload = {
   error?: string;
 };
 
+const POLICY_NEGOTIATION_DEMO_TASK =
+  "Compare AI inference providers and recommend the best overall value using the strongest evidence you can acquire. If PolicyRail blocks a proposed purchase, adapt autonomously to the returned constraints and continue with the best compliant alternative.";
 const INFERENCE_DEMO_TASK =
   "Compare AI inference providers and recommend the best overall value, considering cost efficiency, reliability and latency.";
 const TRAVEL_DEMO_TASK =
@@ -329,6 +331,19 @@ export default function NewTaskPage() {
                 className={styles.preset}
                 type="button"
                 disabled={loading || running}
+                onClick={() => {
+                  setDemoPreset(POLICY_NEGOTIATION_DEMO_TASK, ["search", "data"]);
+                  if (policy) {
+                    setBudget((policy.task_budget_cents / 100).toFixed(2));
+                  }
+                }}
+              >
+                Policy negotiation
+              </button>
+              <button
+                className={styles.preset}
+                type="button"
+                disabled={loading || running}
                 onClick={() =>
                   setDemoPreset(INFERENCE_DEMO_TASK, ["search", "data", "inference"])
                 }
@@ -363,10 +378,11 @@ export default function NewTaskPage() {
           </div>
 
           <div className={styles.disclosure}>
-            <strong>Current MVP scope</strong>
+            <strong>Policy negotiation demo</strong>
             <p>
-              Synthetic resources cover AI inference and Barcelona hotel research. Discovery selects
-              only domain-relevant resources before procurement.
+              Discovery includes every relevant in-scope resource regardless of price. The procurement
+              agent chooses what it wants; PolicyRail returns a machine-readable constraint envelope if
+              that choice violates policy, and the agent can adapt without human approval.
             </p>
           </div>
 
