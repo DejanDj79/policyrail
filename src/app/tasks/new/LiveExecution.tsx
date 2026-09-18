@@ -34,6 +34,20 @@ function payloadNumber(payload: Record<string, unknown> | null, key: string) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function payloadRecord(payload: Record<string, unknown> | null, key: string) {
+  const value = payload?.[key];
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function payloadStringArray(payload: Record<string, unknown> | null, key: string) {
+  const value = payload?.[key];
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
+    ? value as string[]
+    : [];
+}
+
 function payloadAtomic(payload: Record<string, unknown> | null, key: string) {
   const value = payload?.[key];
   if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
@@ -76,7 +90,7 @@ function eventTitle(event: AuditEvent) {
     case "agent_resource_proposed":
       return `Agent proposed ${payloadText(payload, "resource_name") ?? "resource"}`;
     case "payment_rejected":
-      return "PolicyRail blocked payment";
+      return "Constraint envelope returned to agent";
     case "payment_approved":
       return "PolicyRail approved payment";
     case "payment_settled":
@@ -116,8 +130,37 @@ function eventBody(event: AuditEvent) {
     return `${proposal}${proposal && rationale ? " — " : ""}${rationale ?? "Agent selected its next procurement step."}`;
   }
 
-  if (event.event_type === "payment_rejected" || event.event_type === "payment_approved") {
-    return payloadText(payload, "reason") ?? "Deterministic spending policy evaluated the proposal.";
+  if (event.event_type === "payment_rejected") {
+    const reason =
+      payloadText(payload, "reason") ??
+      "Deterministic spending policy rejected the proposal.";
+    const envelope = payloadRecord(payload, "policy_envelope");
+    const change = payloadRecord(envelope, "requiredChange");
+    const maxCompliant = payloadAtomic(envelope, "maxCompliantAmountAtomic");
+    const retryAllowed = envelope?.retryAllowed === true;
+
+    let correction = "";
+    if (change?.field === "amountAtomic" && maxCompliant !== null) {
+      correction = ` Retry at or below ${formatAtomicUsdDisplay(maxCompliant)}.`;
+    } else if (change?.field === "category") {
+      const allowed = payloadStringArray(envelope, "allowedCategories");
+      correction = allowed.length
+        ? ` Retry using an allowed category: ${allowed.join(", ")}.`
+        : "";
+    } else if (change?.field === "provider") {
+      const blocked = payloadStringArray(envelope, "blockedProviders");
+      correction = blocked.length
+        ? ` Retry with a provider outside: ${blocked.join(", ")}.`
+        : " Retry with another provider.";
+    }
+
+    return `${reason} Constraint envelope returned to the agent.${correction}${
+      retryAllowed ? " Autonomous retry allowed." : ""
+    }`;
+  }
+
+  if (event.event_type === "payment_approved") {
+    return payloadText(payload, "reason") ?? "All active spending constraints were satisfied.";
   }
 
   if (event.event_type === "payment_settled") {
@@ -233,7 +276,9 @@ export default function LiveExecution({
     if (status === "completed") return "Execution complete";
     if (status === "failed") return "Execution failed";
     if (events.some((event) => event.event_type === "payment_settled")) return "Settling & synthesizing";
-    if (events.some((event) => event.event_type === "payment_rejected")) return "Adapting to policy";
+    if (events.some((event) => event.event_type === "payment_rejected")) {
+      return "Agent adapting to constraint envelope";
+    }
     if (events.some((event) => event.event_type === "agent_resource_proposed")) return "Evaluating procurement";
     if (events.some((event) => event.event_type === "resource_discovery_completed")) return "Discovery complete";
     return "Discovering resources";
