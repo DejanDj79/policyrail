@@ -99,31 +99,34 @@ export default function WalletCard() {
       {loading && !wallet ? (
         <p className={styles.loading}>Reading wallet…</p>
       ) : wallet ? (
-        <div className={styles.rows}>
-          <div className={styles.row}>
-            <span>Network</span>
-            <strong>{wallet.network ?? "Solana Devnet"}</strong>
-          </div>
-          <div className={styles.row}>
+        <>
+          <div className={styles.balance}>
+            <strong>{displayUsdc(wallet.usdcBalance).replace("$", "")}</strong>
             <span>USDC</span>
-            <strong>{displayUsdc(wallet.usdcBalance)}</strong>
           </div>
-          <div className={styles.row}>
-            <span>SOL</span>
-            <strong>{wallet.solBalance ?? "0.0000"}</strong>
+
+          <div className={styles.rows}>
+            <div className={styles.row}>
+              <span>Network</span>
+              <strong>{wallet.network ?? "Solana Devnet"}</strong>
+            </div>
+            <div className={styles.row}>
+              <span>SOL</span>
+              <strong>{wallet.solBalance ?? "0.0000"}</strong>
+            </div>
+            <div className={styles.row}>
+              <span>Address</span>
+              <a
+                href={explorerHref}
+                target="_blank"
+                rel="noreferrer"
+                title={wallet.address}
+              >
+                {shortAddress(wallet.address!)}
+              </a>
+            </div>
           </div>
-          <div className={styles.row}>
-            <span>Address</span>
-            <a
-              href={explorerHref}
-              target="_blank"
-              rel="noreferrer"
-              title={wallet.address}
-            >
-              {shortAddress(wallet.address!)}
-            </a>
-          </div>
-        </div>
+        </>
       ) : null}
     </aside>
   );
