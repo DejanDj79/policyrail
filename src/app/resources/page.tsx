@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import AppNav from "@/components/AppNav";
 import { useEffect, useMemo, useState } from "react";
 import BazaarPreview from "./BazaarPreview";
 import styles from "./resources.module.css";
@@ -137,19 +138,7 @@ export default function ResourcesPage() {
 
   return (
     <main className={styles.page}>
-      <nav className={styles.nav}>
-        <Link className={styles.brand} href="/dashboard">
-          <span className={styles.mark}>P</span>
-          PolicyRail
-        </Link>
-        <div className={styles.navLinks}>
-          <Link href="/dashboard">Dashboard</Link>
-          <Link href="/tasks/new">New task</Link>
-          <Link className={styles.active} href="/resources">Resources</Link>
-          <Link href="/activity">Activity</Link>
-          <Link href="/policy">Agent policy</Link>
-        </div>
-      </nav>
+      <AppNav active="resources" />
 
       <section className={styles.hero}>
         <div>
