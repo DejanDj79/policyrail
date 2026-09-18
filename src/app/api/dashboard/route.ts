@@ -61,6 +61,7 @@ export async function GET() {
     completedTasksResult,
     rejectedPaymentsResult,
     settledPaymentsResult,
+    decisionReceiptsResult,
   ] = await Promise.all([
     supabase
       .from("policies")
@@ -113,6 +114,10 @@ export async function GET() {
       .select("id", { count: "exact", head: true })
       .eq("agent_id", agent.id)
       .eq("settlement_status", "settled"),
+    supabase
+      .from("policy_decision_receipts")
+      .select("id", { count: "exact", head: true })
+      .eq("agent_id", agent.id),
   ]);
 
   const firstError = [
@@ -124,6 +129,7 @@ export async function GET() {
     completedTasksResult.error,
     rejectedPaymentsResult.error,
     settledPaymentsResult.error,
+    decisionReceiptsResult.error,
   ].find(Boolean);
 
   if (firstError) {
@@ -206,6 +212,7 @@ export async function GET() {
         completedTasks: completedTasksResult.count ?? 0,
         rejectedPayments: rejectedPaymentsResult.count ?? 0,
         settledPayments: settledPaymentsResult.count ?? 0,
+        decisionReceipts: decisionReceiptsResult.count ?? 0,
       },
       recentTasks,
       recentPayments,
