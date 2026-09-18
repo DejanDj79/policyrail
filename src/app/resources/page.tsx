@@ -141,7 +141,7 @@ export default function ResourcesPage() {
     const list = resourceListRef.current;
     if (!list || loading || filtered.length === 0) return;
 
-    function onWheel(event: globalThis.WheelEvent) {
+    function onWheel(event: WheelEvent) {
       const maxScrollLeft = list.scrollWidth - list.clientWidth;
       if (maxScrollLeft <= 1) return;
 
