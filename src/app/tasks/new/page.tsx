@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import AppNav from "@/components/AppNav";
 import { useEffect, useState } from "react";
 import {
   centsToAtomicUsdc,
@@ -294,19 +295,7 @@ export default function NewTaskPage() {
 
   return (
     <main className={styles.page}>
-      <nav className={styles.nav}>
-        <Link className={styles.brand} href="/dashboard">
-          <span className={styles.mark}>P</span>
-          PolicyRail
-        </Link>
-        <div className={styles.navLinks}>
-          <Link href="/dashboard">Dashboard</Link>
-          <Link className={styles.active} href="/tasks/new">New task</Link>
-          <Link href="/resources">Resources</Link>
-          <Link href="/activity">Activity</Link>
-          <Link href="/policy">Agent policy</Link>
-        </div>
-      </nav>
+      <AppNav active="new-task" />
 
       <section className={styles.hero}>
         <div>
