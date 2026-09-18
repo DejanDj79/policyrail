@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import AppNav from "@/components/AppNav";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import PolicySimulator from "./PolicySimulator";
@@ -182,17 +183,7 @@ export default function PolicyPage() {
 
   return (
     <main className="shell">
-      <nav>
-        <Link className="brand brandLink" href="/dashboard">
-          <span className="mark">P</span>
-          PolicyRail
-        </Link>
-        <div className="navLinks">
-          <Link href="/dashboard">Dashboard</Link>
-          <Link href="/">Agent run</Link>
-          <Link className="navActive" href="/policy">Agent policy</Link>
-        </div>
-      </nav>
+      <AppNav active="policy" />
 
       <section className="settingsHero">
         <div>
