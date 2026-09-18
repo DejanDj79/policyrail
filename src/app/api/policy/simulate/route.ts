@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { atomicUsdcFromDecimalString } from "@/lib/money/usdc";
+import { simulatePaymentPolicy } from "@/lib/policy/authorize-payment";
 import type { SpendingCategory } from "@/lib/policy/types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -39,7 +40,10 @@ export async function POST(request: Request) {
   const amountUsdc = body.amountUsdc?.trim();
 
   if (!agentId || !provider || !category || !CATEGORIES.has(category) || !amountUsdc) {
-    return NextResponse.json({ error: "Agent, provider, category and amount are required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Agent, provider, category and amount are required" },
+      { status: 400 }
+    );
   }
 
   const amountAtomic = atomicUsdcFromDecimalString(amountUsdc);
@@ -50,18 +54,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data, error } = await supabase.rpc("simulate_payment_atomic", {
-    p_agent_id: agentId,
-    p_provider: provider,
-    p_category: category,
-    p_amount_atomic: amountAtomic,
-  });
+  try {
+    const simulation = await simulatePaymentPolicy(supabase, {
+      agentId,
+      provider,
+      category,
+      amountAtomic,
+    });
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json(simulation, {
+      headers: { "Cache-Control": "no-store" },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Policy simulation failed";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
-
-  return NextResponse.json(data, {
-    headers: { "Cache-Control": "no-store" },
-  });
 }
