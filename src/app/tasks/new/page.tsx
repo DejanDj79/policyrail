@@ -79,7 +79,7 @@ type RunPayload = {
 };
 
 const POLICY_NEGOTIATION_DEMO_TASK =
-  "Compare AI inference providers and recommend the best overall value using the strongest evidence you can acquire. If PolicyRail blocks a proposed purchase, adapt autonomously to the returned constraints and continue with the best compliant alternative.";
+  "Compare AI inference providers and recommend the best overall value. Start by trying to acquire the strongest available paid evidence source. If PolicyRail blocks a proposed purchase, adapt autonomously to the returned constraints and continue with the best compliant alternative.";
 const INFERENCE_DEMO_TASK =
   "Compare AI inference providers and recommend the best overall value, considering cost efficiency, reliability and latency.";
 const TRAVEL_DEMO_TASK =
@@ -311,10 +311,10 @@ export default function NewTaskPage() {
       <section className={styles.hero}>
         <div>
           <p className={styles.eyebrow}>NEW AUTONOMOUS TASK</p>
-          <h1>Tell the agent what to achieve.</h1>
+          <h1>Set the objective. Freeze the economic boundary.</h1>
           <p>
-            Set the objective and budget. Watch discovery, policy decisions and real x402 settlement
-            happen live in the execution rail.
+            Give the agent a task, budget and purpose-bound spending mandate. It can adapt autonomously
+            inside those boundaries, but it cannot expand them once execution starts.
           </p>
         </div>
       </section>
