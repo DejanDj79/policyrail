@@ -272,6 +272,36 @@ export default function LiveExecution({
     });
   }, [compact, events.length]);
 
+  const negotiationState = useMemo(() => {
+    const rejectedIndex = events.findIndex(
+      (event) => event.event_type === "payment_rejected"
+    );
+
+    if (rejectedIndex === -1) {
+      return {
+        visible: false,
+        adapting: false,
+        approved: false,
+        adaptingActive: false,
+      };
+    }
+
+    const eventsAfterRejection = events.slice(rejectedIndex + 1);
+    const retryProposed = eventsAfterRejection.some(
+      (event) => event.event_type === "agent_resource_proposed"
+    );
+    const approved = eventsAfterRejection.some(
+      (event) => event.event_type === "payment_approved"
+    );
+
+    return {
+      visible: true,
+      adapting: retryProposed || !approved,
+      approved,
+      adaptingActive: status === "running" && !approved,
+    };
+  }, [events, status]);
+
   const headline = useMemo(() => {
     if (status === "completed") return "Execution complete";
     if (status === "failed") return "Execution failed";
@@ -297,6 +327,33 @@ export default function LiveExecution({
           <small>{formatAtomicUsdDisplay(spentAtomic)} settled</small>
         </div>
       </div>
+
+      {negotiationState.visible ? (
+        <div className={styles.negotiationStrip} aria-label="Policy negotiation status">
+          <span className={`${styles.negotiationBadge} ${styles.negotiationRejected}`}>
+            REJECTED
+          </span>
+          <span className={styles.negotiationArrow}>→</span>
+          <span
+            className={[
+              styles.negotiationBadge,
+              negotiationState.adapting ? styles.negotiationAdapting : styles.negotiationPending,
+              negotiationState.adaptingActive ? styles.negotiationPulse : "",
+            ].join(" ")}
+          >
+            ADAPTING
+          </span>
+          <span className={styles.negotiationArrow}>→</span>
+          <span
+            className={[
+              styles.negotiationBadge,
+              negotiationState.approved ? styles.negotiationApproved : styles.negotiationPending,
+            ].join(" ")}
+          >
+            APPROVED
+          </span>
+        </div>
+      ) : null}
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
