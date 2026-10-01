@@ -344,11 +344,40 @@ export default function ActivityDetailPage() {
               <div className={styles.detailMeta}>
                 <span>{task.agent_name}</span>
                 <span>{dateLabel(task.created_at)}</span>
-                <span>Mandate: {task.mandate_allowed_categories.join(" · ")}</span>
                 <span className={styles.status}>{task.status}</span>
               </div>
             </div>
             <Link className={styles.backLink} href="/activity">← All activity</Link>
+          </section>
+
+          <section className={styles.mandatePanel}>
+            <div className={styles.mandateTop}>
+              <div>
+                <p className={styles.label}>TASK SPENDING MANDATE</p>
+                <h2>Frozen economic scope</h2>
+              </div>
+              <span className={styles.mandateStatus}>FROZEN · PURPOSE BOUND</span>
+            </div>
+
+            <p className={styles.mandateCopy}>
+              This spending scope was fixed before execution began. The agent could adapt its resource
+              choice, but it could not add new spending categories after the task started.
+            </p>
+
+            <div className={styles.mandateScope}>
+              <span className={styles.mandateScopeLabel}>Allowed for this task</span>
+              <div className={styles.mandateChips}>
+                {task.mandate_allowed_categories.length > 0 ? (
+                  task.mandate_allowed_categories.map((category) => (
+                    <span className={styles.mandateChip} key={category}>
+                      {category}
+                    </span>
+                  ))
+                ) : (
+                  <span className={styles.mandateEmpty}>No task categories recorded</span>
+                )}
+              </div>
+            </div>
           </section>
 
           <section className={styles.summaryGrid}>
