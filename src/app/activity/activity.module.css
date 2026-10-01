@@ -402,9 +402,9 @@
 }
 
 .detailGrid {
-  --detail-column-height: 620px;
-  --payments-panel-height: 340px;
-  --result-panel-height: 262px;
+  --detail-column-height: 760px;
+  --payments-panel-height: 420px;
+  --result-panel-height: 322px;
   --detail-panel-gap: 18px;
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
@@ -638,7 +638,7 @@
   }
 
   .detailGrid {
-    --detail-column-height: min(540px, 70vh);
+    --detail-column-height: min(620px, 76vh);
   }
 
   .detailGrid > .panel {
@@ -653,11 +653,11 @@
   }
 
   .detailGrid > aside > .panel:first-child {
-    height: 340px;
+    height: 390px;
   }
 
   .resultPanel {
-    height: 262px;
+    height: 280px;
     margin-top: 18px;
   }
 
