@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import AppNav from "@/components/AppNav";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   centsToAtomicUsdc,
   formatAtomicUsdDisplay,
@@ -502,39 +502,50 @@ export default function NewTaskPage() {
 
           <div className={styles.timeline}>
             {attempts.map((attempt, index) => (
-              <div className={styles.timelineItem} key={`${attempt.resourceId}-${index}`}>
-                <div className={styles.timelineTop}>
-                  <div>
-                    <strong>{attempt.resourceName}</strong>
-                    <span>{formatAtomicUsdDisplay(attempt.amountAtomic)} proposed</span>
+              <Fragment key={`${attempt.resourceId}-${index}`}>
+                <div className={styles.timelineItem}>
+                  <div className={styles.timelineTop}>
+                    <div>
+                      <strong>{attempt.resourceName}</strong>
+                      <span>{formatAtomicUsdDisplay(attempt.amountAtomic)} proposed</span>
+                    </div>
+                    <span className={attempt.approved ? styles.approved : styles.rejected}>
+                      {attempt.approved ? "APPROVED" : "REJECTED"}
+                    </span>
                   </div>
-                  <span className={attempt.approved ? styles.approved : styles.rejected}>
-                    {attempt.approved ? "APPROVED" : "REJECTED"}
-                  </span>
+                  <p><b>Agent:</b> {attempt.agentRationale}</p>
+                  <p><b>PolicyRail:</b> {attempt.policyReason}</p>
+                  {!attempt.approved ? (
+                    <p>
+                      <b>Constraint envelope → agent:</b>{" "}
+                      Max compliant {formatAtomicUsdDisplay(attempt.policyEnvelope.maxCompliantAmountAtomic)}
+                      {envelopeCorrection(attempt) ? ` · ${envelopeCorrection(attempt)}` : ""}
+                      {attempt.policyEnvelope.retryAllowed ? " · autonomous retry allowed" : ""}
+                    </p>
+                  ) : null}
+                  {attempt.transactionSignature ? (
+                    <a
+                      href={solanaExplorerTransactionUrl(
+                        attempt.transactionSignature,
+                        attempt.settlementNetwork
+                      )}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Settled · {solanaNetworkLabel(attempt.settlementNetwork)} · {shortSignature(attempt.transactionSignature)} ↗
+                    </a>
+                  ) : null}
                 </div>
-                <p><b>Agent:</b> {attempt.agentRationale}</p>
-                <p><b>PolicyRail:</b> {attempt.policyReason}</p>
-                {!attempt.approved ? (
-                  <p>
-                    <b>Constraint envelope → agent:</b>{" "}
-                    Max compliant {formatAtomicUsdDisplay(attempt.policyEnvelope.maxCompliantAmountAtomic)}
-                    {envelopeCorrection(attempt) ? ` · ${envelopeCorrection(attempt)}` : ""}
-                    {attempt.policyEnvelope.retryAllowed ? " · autonomous retry allowed" : ""}
-                  </p>
+
+                {!attempt.approved && index < attempts.length - 1 ? (
+                  <div className={styles.adaptingStep}>
+                    <span className={styles.adaptingLine} />
+                    <span className={styles.adaptingBadge}>ADAPTING</span>
+                    <span className={styles.adaptingText}>Agent retrying inside the returned policy constraints</span>
+                    <span className={styles.adaptingLine} />
+                  </div>
                 ) : null}
-                {attempt.transactionSignature ? (
-                  <a
-                    href={solanaExplorerTransactionUrl(
-                      attempt.transactionSignature,
-                      attempt.settlementNetwork
-                    )}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Settled · {solanaNetworkLabel(attempt.settlementNetwork)} · {shortSignature(attempt.transactionSignature)} ↗
-                  </a>
-                ) : null}
-              </div>
+              </Fragment>
             ))}
           </div>
 
