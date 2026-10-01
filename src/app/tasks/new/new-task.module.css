@@ -106,8 +106,9 @@
 }
 
 .panel {
-  height: var(--task-panel-height);
-  overflow: hidden;
+  min-height: var(--task-panel-height);
+  height: auto;
+  overflow: visible;
 }
 
 .panelHeader,
