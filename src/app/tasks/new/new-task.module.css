@@ -485,6 +485,40 @@
   padding: 16px;
 }
 
+.adaptingStep {
+  display: grid;
+  grid-template-columns: minmax(18px, 1fr) auto minmax(0, max-content) minmax(18px, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 1px 8px;
+}
+
+.adaptingLine {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(134, 247, 200, 0.24));
+}
+
+.adaptingLine:last-child {
+  background: linear-gradient(90deg, rgba(134, 247, 200, 0.24), transparent);
+}
+
+.adaptingBadge {
+  border: 1px solid rgba(134, 247, 200, 0.3);
+  border-radius: 999px;
+  background: rgba(134, 247, 200, 0.08);
+  color: var(--accent);
+  padding: 5px 8px;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.adaptingText {
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
 .timelineTop {
   display: flex;
   justify-content: space-between;
@@ -639,6 +673,18 @@
   .guardrails,
   .compactFlow {
     grid-template-columns: 1fr;
+  }
+
+  .adaptingStep {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .adaptingLine {
+    display: none;
+  }
+
+  .adaptingText {
+    white-space: normal;
   }
 
   .guardrails div,
