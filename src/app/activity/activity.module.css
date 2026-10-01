@@ -402,9 +402,9 @@
 }
 
 .detailGrid {
-  --detail-column-height: 760px;
-  --payments-panel-height: 420px;
-  --result-panel-height: 322px;
+  --detail-column-height: 860px;
+  --payments-panel-height: 480px;
+  --result-panel-height: 362px;
   --detail-panel-gap: 18px;
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
