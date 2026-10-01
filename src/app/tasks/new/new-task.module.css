@@ -91,7 +91,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 390px;
   gap: 18px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .panel,
@@ -390,10 +390,10 @@
   top: 16px;
   box-sizing: border-box;
   width: 100%;
-  height: var(--task-panel-height);
+  height: 100%;
   min-width: 0;
-  min-height: 0;
-  max-height: var(--task-panel-height);
+  min-height: var(--task-panel-height);
+  max-height: none;
   overflow: hidden;
 }
 
