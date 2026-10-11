@@ -1,139 +1,166 @@
-# PolicyRail — Final 2–3 Minute Presentation Video Script
+# PolicyRail — Final Presentation Video Script
 
 ## Goal
 
-This is the **pitch video**, not the product demo.
+This is the **pitch / presentation video**, not the product demo.
 
-The demo proves that PolicyRail works. This video explains why PolicyRail should exist as a company.
+The demo proves that PolicyRail works. This video explains the problem, the product thesis, the differentiation, the target users, and the long-term opportunity.
 
-Target length: **2:15–2:45**
+Format: **voice-over only + motion graphics + a small number of product screenshots**.
 
----
+Target runtime: approximately **2:35**.
 
-## 0:00–0:18 — Founder intro on camera
-
-### Screen
-
-Camera on Dejan.
-
-### Say
-
-"Hi, I'm Dejan. I'm a software developer working in robotics and autonomous systems.
-
-I built PolicyRail because as AI agents become able to spend real money, I believe their financial authority should live outside the model."
+Do not require the founder to appear on camera.
 
 ---
 
-## 0:18–0:38 — Problem
+## Final voice-over
 
-### Screen
+"Hi, I’m Dejan, creator of PolicyRail. As AI agents become able to spend real money, I believe their financial authority should live outside the model.
 
-Transition from camera to Scene 1 visual.
+Agents are beginning to buy APIs, data, compute and other machine-readable services autonomously. Payment rails are getting better at moving money, but organizations still need a reliable way to control why, when, and how an agent is allowed to spend.
 
-### Say
+A spending limit can reject a transaction. But for an autonomous workflow, a simple no is often a dead end. Either a human has to step in, or the agent needs too much authority.
 
-"AI agents are beginning to buy APIs, data, compute and other machine-readable services on their own.
+PolicyRail is the economic control plane between agent intent and payment execution. The agent decides what it wants to buy. PolicyRail deterministically decides whether that economic action is allowed.
 
-The payment rails are arriving quickly. What is still missing is a strong economic control layer between what an agent wants to do and what an organization is actually willing to authorize.
+If a purchase violates policy, PolicyRail doesn’t return a generic failure. It returns a machine-readable constraint envelope with the exact reason, the maximum compliant amount, the remaining budget, and what must change for a retry.
 
-Today, a spending limit can block a transaction. But a blocked transaction usually becomes a dead end for the workflow."
+The agent can then adapt autonomously inside that boundary. It may change its decision, but it never gets authority to change the policy.
 
----
+Each task can also freeze a purpose-bound spending mandate, so the agent cannot expand the economic purpose of a task after execution begins.
 
-## 0:38–1:02 — Product
+And every approval or rejection produces a canonical hashed Policy Decision Receipt, creating a decision trail alongside the payment transaction itself.
 
-### Say
+We’re starting with developers building research agents, browser agents, model-routing systems and other autonomous workflows that need to purchase external resources programmatically.
 
-"PolicyRail is the economic control plane for autonomous agents.
+PolicyRail sits above existing wallets and payment rails rather than replacing them. Over time, that control plane can expand into organization budgets, policy hierarchies, compliance reporting and economic observability across entire fleets of agents.
 
-The agent decides what it wants to buy. PolicyRail deterministically decides whether that economic action is allowed.
-
-If a purchase is rejected, PolicyRail does not just return an error. It returns a machine-readable constraint envelope: the exact reason, maximum compliant amount, remaining budget, valid task scope, and what must change for a retry.
-
-The agent can then adapt autonomously without gaining authority to rewrite the rules."
+Agents should be autonomous in their decisions, not sovereign over their financial authority. PolicyRail is built to enforce that boundary."
 
 ---
 
-## 1:02–1:27 — Why this is different
+## Visual sequence keyed to narration
 
-### Say
+### Intro
 
-"Spending limits and wallet policies already exist. We are not trying to replace wallet infrastructure.
+Switch visual on: **“Hi, I’m Dejan, creator of PolicyRail.”**
 
-Our wedge is what happens after policy says no.
+Show PolicyRail logo and **Economic control plane for autonomous AI agents**.
 
-PolicyRail turns a deterministic rejection into a negotiation boundary an agent can reason inside.
+### Agents are becoming economic actors
 
-Each task also carries a frozen purpose-bound spending mandate, so the AI cannot broaden the economic purpose of a task once execution begins.
+On **“Agents are beginning to buy APIs, data, compute...”** show AI Agent with API, Data, and Compute.
 
-And every approved or rejected decision creates a canonical, hash-addressed Policy Decision Receipt."
+On **“Payment rails are getting better at moving money...”** add Wallet / payment rail.
+
+On **“organizations still need a reliable way to control...”** show **WHO CONTROLS THE AUTHORITY?**
+
+### Why binary rejection is not enough
+
+On **“A spending limit can reject a transaction.”** show AI Agent → $0.25 purchase → Policy → REJECTED.
+
+On **“a simple no is often a dead end.”** show **DEAD END — Workflow stops here**.
+
+On **“Either a human has to step in...”** show Human intervention vs More agent authority, with **Neither scales well.**
+
+### PolicyRail as the control plane
+
+On **“PolicyRail is the economic control plane...”** show AI Agent → PolicyRail → Wallet / x402 → Provider.
+
+Under PolicyRail show: Budget, Max transaction, Purpose, Categories, Providers.
+
+On **“The agent decides what it wants to buy.”** show **AGENT = DECISION — What should I buy?**
+
+On **“PolicyRail deterministically decides...”** show **POLICYRAIL = AUTHORITY — Am I allowed to buy it?**
+
+### Policy Constraint Envelope
+
+On **“If a purchase violates policy...”** show $0.25 proposal → PolicyRail → REJECTED with TRANSACTION_LIMIT_EXCEEDED.
+
+On **“It returns a machine-readable constraint envelope...”** show a Policy Constraint Envelope with implemented demo fields:
+
+- Requested: $0.25
+- Max transaction: $0.10
+- Max compliant: $0.10
+- Remaining task budget
+- Allowed scope: search · data
+- Retry allowed: true
+- Required change: amount <= $0.10
+
+On **“what must change for a retry.”** show PolicyRail → Constraint Envelope → AI Agent with **Exact boundary. Actionable retry.**
+
+### Autonomous adaptation
+
+On **“The agent can then adapt autonomously...”** show REJECTED → ADAPTING → $0.07 compliant alternative.
+
+On **“It may change its decision...”** show **AGENT DECISION CAN CHANGE**.
+
+Continue through **“but it never gets authority to change the policy.”** with **POLICY AUTHORITY DOES NOT CHANGE** and **CHANGE THE DECISION. NOT THE POLICY.**
+
+### Frozen task purpose
+
+On **“Each task can also freeze a purpose-bound spending mandate...”** show Task Spending Mandate, Search, Data, **FROZEN · PURPOSE BOUND**, and **Scope fixed before execution**.
+
+On **“cannot expand the economic purpose...”** show Search and Data as allowed, Compute and Inference as scope expansion, with **TASK SCOPE CANNOT EXPAND**.
+
+### Policy Decision Receipt + settlement proof
+
+On **“every approval or rejection produces a canonical hashed Policy Decision Receipt...”** show a stylized receipt using only fields that exist in the PolicyRail audit UI / data model:
+
+- Provider: ValueBench
+- Resource: Independent benchmark lite
+- Category: data
+- Network: Solana Devnet
+- Amount: $0.07
+- Decision: APPROVED
+- Settlement: SETTLED
+- Reason: actual policy decision reason
+- Decision receipt: policyrail-decision-v1
+- SHA-256: shortened receipt hash
+
+Do not invent fields such as employee, travel policy, corporate card, client, expense category, or rule-matched IDs.
+
+On **“creating a decision trail alongside the payment transaction itself.”** show Policy Decision Receipt next to x402 Settlement.
+
+The settlement side may show Provider, Resource, Amount, Network, Settled status, and Transaction signature.
+
+Close the visual with **PAYMENT PROVES MONEY MOVED. RECEIPT PROVES WHY.**
+
+### Initial users
+
+On **“We’re starting with developers building...”** show Research agents, Browser agents, Model-routing systems, and Autonomous / enterprise workflows.
+
+Supporting line: **SDK / API control layer**.
+
+### Business / expansion
+
+On **“PolicyRail sits above existing wallets and payment rails...”** show Agent workflows → PolicyRail → Wallets / x402 / payment rails.
+
+On **“Over time...”** expand into Organization budgets, Policy hierarchies, Compliance reporting, Economic observability, and Multi-agent / fleet controls.
+
+### Closing
+
+On **“Agents should be autonomous in their decisions...”** return to a clean PolicyRail closing slide.
+
+Show **Autonomous decisions. Controlled financial authority.**
+
+Final supporting line: **PolicyRail — the economic control plane for autonomous AI agents.**
 
 ---
 
-## 1:27–1:49 — Why now
+## Presentation rules
 
-### Say
+- Voice-over only; no founder camera footage is required.
+- Use motion graphics and simple product-accurate diagrams.
+- Do not turn the pitch into a second product demo.
+- Do not lead with Solana or x402. Lead with the economic-control problem.
+- Do not claim PolicyRail is the first system of its kind.
+- Do not claim competitors lack spending limits or wallet policies.
+- Never invent PolicyRail receipt fields or enterprise/customer data for illustration.
+- Use simple fades/cuts and restrained motion.
+- Keep the Policy Constraint Envelope and autonomous adaptation as the visual center of the story.
 
-"The market is moving toward autonomous machine payments now.
+## Closing line
 
-Major platforms are already adding agent payment orchestration, x402 support, spending budgets and wallet controls.
-
-That validates the category.
-
-But as agents become more autonomous, companies will need a layer above the wallet that can express organizational intent, return actionable policy feedback and leave a decision trail."
-
----
-
-## 1:49–2:12 — Go to market
-
-### Say
-
-"Our initial users are developers building research agents, browser agents, model-routing agents and enterprise workflows that need to buy external resources programmatically.
-
-We would integrate PolicyRail as a control layer in front of existing wallet and payment providers rather than asking teams to replace them.
-
-Our first distribution path is developer-first: SDK and API integration, x402-native examples, and partnerships with agent frameworks and paid-resource marketplaces."
-
----
-
-## 2:12–2:31 — Business / expansion
-
-### Say
-
-"The long-term product expands from transaction limits into hierarchical budgets, task-purpose policies, team and organization controls, policy simulation, compliance reporting and economic observability across many agents.
-
-The payment rail underneath can change. PolicyRail remains the control plane above it."
-
----
-
-## 2:31–2:45 — Close on camera
-
-### Screen
-
-Return to camera.
-
-### Say
-
-"Agents should be autonomous in their decisions, not sovereign over their financial authority.
-
-That is what PolicyRail is built to enforce."
-
----
-
-## Recording guidance
-
-- Start on camera for the founder introduction, move to clean slides/product stills, and return to camera for the final line.
-- Keep the product demo for the separate demo video.
-- Do not spend more than ~30 seconds on architecture.
-- Lead with the control problem, not Solana/x402.
-- Mention that existing payment-policy products validate the market rather than pretending the category is empty.
-- End with the same closing line used in the submission.
-
-## Suggested visual sequence
-
-1. Title: PolicyRail — Economic control plane for autonomous agents
-2. Simple diagram: Agent intent → PolicyRail → Wallet / x402
-3. Rejection → Constraint Envelope → Autonomous Retry
-4. Frozen task mandate + Decision Receipt
-5. Initial users / GTM
-6. Closing line
+**Agents should be autonomous in their decisions, not sovereign over their financial authority. PolicyRail is built to enforce that boundary.**
