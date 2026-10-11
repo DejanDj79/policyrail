@@ -135,6 +135,32 @@ Settlement side can show Provider, Resource, Amount, Network, Settled status, an
 
 Bottom line: **PAYMENT PROVES MONEY MOVED. RECEIPT PROVES WHY.**
 
+## Current production status
+
+Presentation video assembly is in progress in DaVinci Resolve 21.
+
+Completed / already assembled:
+- Scene 1 — Intro
+- Scene 2 — Agents can spend
+- Scene 3 — Binary rejection becomes a dead end
+- Scene 4 — PolicyRail control plane
+- Scene 5 — Constraint Envelope
+- Scene 6 — Autonomous adaptation
+- Scene 7 — Frozen task mandate
+- Scene 8 — Policy Decision Receipt / settlement proof
+
+Next scene to build:
+- **Scene 9 — Initial users**
+
+Important continuity note:
+- Graphics should be generated as separate 16:9 images, not combined into one split image unless the scene explicitly calls for a split layout.
+- Keep the same dark navy / neon cyan-green-purple visual language.
+- Use Rajdhani for ordinary white presentation text when available; monospace only for hashes / technical values.
+- Do not invent product fields or business data that are not present in PolicyRail.
+- Switch visuals according to the exact voice-over trigger phrases in this storyboard, not estimated timestamps.
+
+---
+
 ## Scene 9 — Initial users
 
 Trigger: **“We’re starting with developers building...”**
