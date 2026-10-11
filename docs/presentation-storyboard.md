@@ -2,311 +2,212 @@
 
 ## Format
 
-Target length: **2:20–2:40**
+Target runtime: approximately **2:35**.
 
-Use **camera + 6 visual scenes + camera close**. Keep each visual scene simple: one headline, one core visual, at most 2–3 supporting points.
+Use **voice-over + graphics + selective product screenshots**.
 
-Do not use the full product demo inside this video. The product demo is a separate submission asset.
+There is **no on-camera founder segment** in the final format.
 
----
-
-## Camera intro — Founder
-
-**Time:** 0:00–0:18
-
-### Visual
-
-Dejan on camera, clean background, medium framing.
-
-Optional lower-third:
-
-**Dejan — Software Developer, Robotics & Autonomous Systems**
-
-### Narration
-
-"Hi, I'm Dejan. I'm a software developer working in robotics and autonomous systems. I built PolicyRail because as AI agents become able to spend real money, I believe their financial authority should live outside the model."
-
-### Transition
-
-Simple cut or short fade into Scene 1.
+The product demo is a separate submission asset. This presentation explains the product thesis, differentiation, market entry, and long-term control-plane opportunity.
 
 ---
 
-## Scene 1 — The problem
+## Scene 1 — Intro
 
-**Time:** 0:18–0:38
+Trigger: **“Hi, I’m Dejan, creator of PolicyRail.”**
 
-### Headline
+Visual: clean PolicyRail opening slide with logo and **Economic control plane for autonomous AI agents**.
 
-**Autonomous agents can spend. Who controls the economic boundary?**
+## Scene 2 — Agents can spend
 
-### Visual
+Trigger: **“Agents are beginning to buy APIs, data, compute...”**
 
-Simple diagram:
+Visual progression: AI Agent → API / Data / Compute → Wallet / payment rail.
 
-`AI Agent → Wallet → Paid API`
+End on **WHO CONTROLS THE AUTHORITY?**
 
-Then show a large red stop / denied transaction between wallet and API.
+## Scene 3 — Binary rejection becomes a dead end
 
-Under it:
+Trigger: **“A spending limit can reject a transaction.”**
 
-**Binary payment controls stop transactions — and often stop the workflow.**
+Visual: AI Agent → $0.25 purchase → Policy → REJECTED.
 
-### Narration
+Trigger: **“a simple no is often a dead end.”**
 
-"AI agents are beginning to buy APIs, data, compute and other machine-readable services on their own. The payment rails are arriving quickly. What is still missing is a strong economic control layer between what an agent wants to do and what an organization is actually willing to authorize. Today, a spending limit can block a transaction. But a blocked transaction usually becomes a dead end for the workflow."
+Visual: **DEAD END — Workflow stops here**.
 
-### Design note
+Trigger: **“Either a human has to step in...”**
 
-Do not mention Solana or x402 yet.
+Visual: Human intervention vs More agent authority. Bottom line: **Neither scales well.**
 
----
+## Scene 4 — PolicyRail control plane
 
-## Scene 2 — PolicyRail
+Trigger: **“PolicyRail is the economic control plane...”**
 
-**Time:** 0:38–1:02
+Visual: AI Agent → PolicyRail → Wallet / x402 → Provider.
 
-### Headline
+PolicyRail sublabels: Budget, Max transaction, Purpose, Categories, Providers.
 
-**PolicyRail is the economic control plane for autonomous agents.**
+Trigger: **“The agent decides what it wants to buy.”**
 
-### Visual
+Visual: **AGENT = DECISION — What should I buy?**
 
-Architecture line:
+Trigger: **“PolicyRail deterministically decides whether that economic action is allowed.”**
 
-`Agent intent → PolicyRail → Wallet / x402 / payment rail`
+Visual: **POLICYRAIL = AUTHORITY — Am I allowed to buy it?**
 
-Under PolicyRail show three small labels:
+## Scene 5 — Constraint Envelope
 
-- Deterministic policy
-- Task scope
-- Budget state
+Trigger: **“If a purchase violates policy...”**
 
-### Narration
+Visual: $0.25 → PolicyRail → REJECTED with TRANSACTION_LIMIT_EXCEEDED.
 
-"PolicyRail is the economic control plane between an agent's intent and the payment rail. The agent decides what it wants to buy. PolicyRail deterministically decides whether that economic action is allowed."
+Trigger: **“It returns a machine-readable constraint envelope...”**
 
-### Design note
+Visual: Policy Constraint Envelope using demo-accurate fields:
 
-PolicyRail box should be the visual focus, not the wallet.
+- Requested: $0.25
+- Max transaction: $0.10
+- Max compliant: $0.10
+- Remaining task budget
+- Allowed scope: search · data
+- Retry allowed: true
+- Required change: amount <= $0.10
 
----
+Trigger: **“what must change for a retry.”**
 
-## Scene 3 — The differentiator
+Visual: PolicyRail → Constraint Envelope → AI Agent.
 
-**Time:** 1:02–1:27
+Supporting lines: **Machine-readable feedback** and **Exact boundary. Actionable retry.**
 
-### Headline
+## Scene 6 — Autonomous adaptation
 
-**Policy says NO. The workflow keeps going.**
+Trigger: **“The agent can then adapt autonomously inside that boundary.”**
 
-### Visual
+Visual: REJECTED → ADAPTING → $0.07 alternative.
 
-Show a three-step flow:
+Trigger: **“It may change its decision...”**
 
-1. **Proposal: $0.25**
-2. **REJECTED — max compliant $0.10**
-3. **Agent retries at $0.07**
+Visual: **AGENT DECISION CAN CHANGE**.
 
-Between steps 2 and 3 show a highlighted object:
+Continue through **“but it never gets authority to change the policy.”**
 
-**Policy Constraint Envelope**
+Visual: **POLICY AUTHORITY DOES NOT CHANGE** and **CHANGE THE DECISION. NOT THE POLICY.**
 
-Inside it show only:
+## Scene 7 — Frozen task mandate
 
-- `TRANSACTION_LIMIT_EXCEEDED`
-- `maxCompliant: $0.10`
-- `retryAllowed: true`
+Trigger: **“Each task can also freeze a purpose-bound spending mandate...”**
 
-### Narration
+Visual: Task Spending Mandate with Search, Data, **FROZEN · PURPOSE BOUND**, and Scope fixed before execution.
 
-"If a purchase is rejected, PolicyRail does not just return an error. It returns a machine-readable constraint envelope: the exact reason, maximum compliant amount, remaining budget, valid task scope, and what must change for a retry. The agent can then adapt autonomously without gaining authority to rewrite the rules."
+Trigger: **“cannot expand the economic purpose...”**
 
-### Design note
+Visual: Search and Data allowed; Compute and Inference blocked as scope expansion.
 
-This is the most important slide in the entire presentation. Hold it long enough to understand the flow.
+Bottom line: **TASK SCOPE CANNOT EXPAND — Agent may adapt resources, not purpose.**
 
----
+## Scene 8 — Policy Decision Receipt
 
-## Scene 4 — Purpose + proof
+Trigger: **“every approval or rejection produces a canonical hashed Policy Decision Receipt...”**
 
-**Time:** 1:27–1:49
+Visual: product-accurate receipt. Example approved demo decision:
 
-### Headline
+- Provider: ValueBench
+- Resource: Independent benchmark lite
+- Category: data
+- Network: Solana Devnet
+- Amount: $0.07
+- Decision: APPROVED
+- Settlement: SETTLED
+- Reason: actual policy decision reason
+- Decision receipt: policyrail-decision-v1
+- SHA-256: shortened hash
 
-**Autonomy stays inside a frozen purpose. Every decision leaves proof.**
+Important: both approved and rejected policy decisions can have receipts, but a rejected decision must never be presented as settled.
 
-### Visual
+Do not invent travel, employee, client, corporate-card, expense, rule-matched, or other unrelated fields.
 
-Split screen.
+Trigger: **“creating a decision trail alongside the payment transaction itself.”**
 
-Left:
+Visual: Policy Decision Receipt linked to x402 Settlement.
 
-**Frozen Task Mandate**
+Settlement side can show Provider, Resource, Amount, Network, Settled status, and Transaction signature.
 
-`search + data`
+Bottom line: **PAYMENT PROVES MONEY MOVED. RECEIPT PROVES WHY.**
 
-Small caption:
+## Scene 9 — Initial users
 
-**AI cannot expand scope after execution starts**
+Trigger: **“We’re starting with developers building...”**
 
-Right:
+Visual: Research agents, Browser agents, Model-routing systems, Autonomous / enterprise workflows.
 
-**Policy Decision Receipt**
+Supporting line: **SDK / API control layer**.
 
-Show stylized receipt:
+## Scene 10 — Expansion
 
-- Decision: REJECTED / APPROVED
-- Policy version
-- Budget state
-- Constraint envelope
-- SHA-256 hash
+Trigger: **“PolicyRail sits above existing wallets and payment rails rather than replacing them.”**
 
-### Narration
+Visual stack: Agent workflows → PolicyRail → Wallets / x402 / payment rails.
 
-"Each task carries a frozen purpose-bound spending mandate, so the AI cannot broaden the economic purpose of a task once execution begins. And every approved or rejected decision creates a canonical, hash-addressed Policy Decision Receipt."
+Trigger: **“Over time...”**
 
----
+Expand to Organization budgets, Policy hierarchies, Compliance reporting, Economic observability, and Multi-agent / fleet controls.
 
-## Scene 5 — Why now / market
+## Scene 11 — Closing
 
-**Time:** 1:49–2:12
+Trigger: **“Agents should be autonomous in their decisions...”**
 
-### Headline
+Visual: clean brand slide.
 
-**Agent payments are becoming infrastructure. Governance becomes the next layer.**
+Show **Autonomous decisions. Controlled financial authority.**
 
-### Visual
-
-Use three neutral category boxes, not competitor logos unless licensing/visual quality is clean:
-
-- Agent wallets
-- x402 / machine payments
-- Paid APIs & agent services
-
-Arrow below all three pointing to:
-
-**Need: economic governance across autonomous workflows**
-
-Small line:
-
-**Wallet policy validates the category. PolicyRail focuses on adaptive policy negotiation.**
-
-### Narration
-
-"The market is moving toward autonomous machine payments now. Major platforms are already adding agent payment orchestration, x402 support, spending budgets and wallet controls. That validates the category. But as agents become more autonomous, companies will need a layer above the wallet that can express organizational intent, return actionable policy feedback and leave a decision trail."
-
----
-
-## Scene 6 — Go-to-market + close
-
-**Time:** 2:12–2:31
-
-### Headline
-
-**Start with developers. Expand into the economic control plane for many agents.**
-
-### Visual
-
-Top row:
-
-**Initial users**
-
-- Research agents
-- Browser agents
-- Model-routing / inference agents
-- Enterprise workflow agents
-
-Bottom row:
-
-**Distribution**
-
-`SDK / API → Agent frameworks → Wallet & payment partners → Enterprise controls`
-
-### Narration
-
-"Our initial users are developers building research agents, browser agents, model-routing agents and enterprise workflows that need to buy external resources programmatically. We integrate as a control layer in front of existing wallet and payment providers rather than asking teams to replace them. The long-term product expands into hierarchical budgets, task-purpose policies, organization controls, policy simulation and compliance reporting. Agents should be autonomous in their decisions, not sovereign over their financial authority."
-
----
-
-## Camera close
-
-**Time:** 2:31–2:45
-
-### Visual
-
-Return to Dejan on camera.
-
-### Narration
-
-"Agents should be autonomous in their decisions, not sovereign over their financial authority. That is what PolicyRail is built to enforce."
+Final supporting line: **Economic control plane for autonomous AI agents**.
 
 ---
 
 # Visual style
 
-Keep it consistent with the product UI:
-
-- very dark background
-- off-white primary text
+- dark navy / near-black background
+- white primary text
 - muted gray secondary text
-- green accent for approved / allowed / PolicyRail
-- soft red only for rejected / blocked
+- cyan / green accents for allowed and approved states
+- restrained red for rejected / blocked states
 - rounded cards
-- minimal borders
-- no gradients unless already present in the app
+- thin borders
+- light glow only where it improves hierarchy
 - no stock photography
 - no crypto coin imagery
 
-## Typography hierarchy
+Typography:
+- Rajdhani preferred for ordinary presentation text when available
+- monospace only for technical values / hashes
 
-- Main headline: large, max 1–2 lines
-- Supporting line: one sentence
-- Technical labels: small monospace where useful
-
-## Animation
-
-Use only simple motion:
-
-- fade in
-- left-to-right flow
-- highlight the Policy Constraint Envelope
-- fade between scenes
-
-Avoid flashy transitions.
+Animation:
+- simple fades
+- cuts
+- light left-to-right motion
+- highlight the Constraint Envelope
+- avoid flashy transitions
 
 ---
 
-# What not to show in the pitch video
+# What not to show
 
-- long dashboard walkthrough
-- Bazaar probing tables
+- full dashboard walkthrough
+- long Bazaar tables
 - environment variables
-- RPC/network configuration
-- code
+- RPC configuration
 - database schema
-- detailed Solana mechanics
-- every feature in PolicyRail
+- code
+- every app feature
+- fabricated enterprise data or fabricated receipt fields
 
-Those belong in the product demo or technical Q&A.
-
----
-
-# Asset checklist
-
-Prepare these before editing:
-
-1. PolicyRail logo
-2. Dark background matching the app
-3. Simple Agent → PolicyRail → Wallet diagram
-4. Constraint Envelope card
-5. Frozen Mandate card
-6. Decision Receipt card
-7. GTM / distribution diagram
-8. Final closing slide
+Those belong in the separate product demo or technical Q&A.
 
 ---
 
 # Final editing rule
 
-If a scene cannot be understood in **three seconds without narration**, simplify it.
+Every visual must support exactly what the narration is saying at that moment.
+
+If a visual introduces a product field, policy primitive, or business fact that PolicyRail does not actually implement or claim, remove it.
